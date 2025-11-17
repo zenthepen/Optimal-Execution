@@ -38,11 +38,12 @@ env/
 .ipynb_checkpoints
 *.ipynb
 
-# Test outputs
+# Test outputs (but keep docs/images/results/*.png for GitHub display)
 *.csv
-*.png
 *.pdf
 *.log
+*.png
+!docs/images/results/*.png
 
 # Results
 results/
