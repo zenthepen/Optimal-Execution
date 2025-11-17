@@ -1,0 +1,20 @@
+{
+  "ticker": "AAPL",
+  "volatility_range": {
+    "min": 0.16869270135417705,
+    "max": 0.36672905116888704
+  },
+  "trade_size_range": {
+    "min_shares": 5421,
+    "max_shares": 271098,
+    "adv_shares": 54219646
+  },
+  "time_horizon_range": {
+    "min_days": 0.5,
+    "max_days": 2.0
+  },
+  "risk_aversion_range": {
+    "min": 1e-07,
+    "max": 1e-05
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "ticker": "PLUG",
+  "eta": 8.766135171980854e-07,
+  "gamma": 0.6040577917039819,
+  "r_squared": 0.148264149167316,
+  "n_samples": 1274,
+  "mean_volume": 39836552.77472527,
+  "std_volume": 40755197.98996443,
+  "mean_return": 0.04472853309081381,
+  "std_return": 0.042465947277933076,
+  "calibration_date": "2025-10-27",
+  "lookback_days": 1260,
+  "method": "Zarinelli log-log regression",
+  "data_source": "Yahoo Finance",
+  "S0": 2.984999895095825,
+  "S0_date": "2025-10-27"
+}

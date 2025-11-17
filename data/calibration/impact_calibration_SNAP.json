@@ -1,0 +1,17 @@
+{
+  "ticker": "SNAP",
+  "eta": 1.9958415539866728e-07,
+  "gamma": 0.6674945552969775,
+  "r_squared": 0.1357033172157468,
+  "n_samples": 1287,
+  "mean_volume": 33378013.05361305,
+  "std_volume": 31489206.568589017,
+  "mean_return": 0.029676970040223374,
+  "std_return": 0.034802424655431645,
+  "calibration_date": "2025-10-27",
+  "lookback_days": 1260,
+  "method": "Zarinelli log-log regression",
+  "data_source": "Yahoo Finance",
+  "S0": 7.920000076293945,
+  "S0_date": "2025-10-27"
+}

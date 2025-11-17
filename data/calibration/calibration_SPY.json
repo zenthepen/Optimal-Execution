@@ -1,0 +1,43 @@
+{
+  "ticker": "SPY",
+  "volatility": {
+    "base_vol": 0.1316366844512295,
+    "vol_min": 0.09316464533101132,
+    "vol_max": 0.25859719345750737,
+    "vol_regime_min": 0.7077407465813846,
+    "vol_regime_max": 1.964476654327433
+  },
+  "trade_size": {
+    "adv": 66474212.04819277,
+    "trade_size_min": 6647,
+    "trade_size_max": 332371,
+    "pct_adv_min": 0.0001,
+    "pct_adv_max": 0.005
+  },
+  "time_horizon": {
+    "time_horizon_min": 0.5,
+    "time_horizon_max": 2.0,
+    "source": "Almgren (2003)",
+    "note": "Typical execution window for institutional orders"
+  },
+  "risk_aversion": {
+    "lambda_min": 1e-07,
+    "lambda_max": 1e-05,
+    "lambda_typical": 1e-06,
+    "source": "Almgren (2003)",
+    "note": "Higher \u03bb = more risk averse (prioritize certainty over cost)"
+  },
+  "discretization": {
+    "N": 40,
+    "dt_minutes": 19.5,
+    "steps_per_day": 20.0,
+    "note": "Provides good balance between accuracy and computation time"
+  },
+  "calibration_date": "2025-10-27",
+  "data_sources": {
+    "volatility": "Yahoo Finance (5 years)",
+    "volume": "Yahoo Finance (1 years)",
+    "time_horizon": "Almgren (2003)",
+    "risk_aversion": "Almgren (2003)"
+  }
+}

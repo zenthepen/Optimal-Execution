@@ -1,0 +1,20 @@
+{
+  "ticker": "MSFT",
+  "volatility_range": {
+    "min": 0.15016170331797538,
+    "max": 0.35839688630112815
+  },
+  "trade_size_range": {
+    "min_shares": 2173,
+    "max_shares": 108654,
+    "adv_shares": 21730873
+  },
+  "time_horizon_range": {
+    "min_days": 0.5,
+    "max_days": 2.0
+  },
+  "risk_aversion_range": {
+    "min": 1e-07,
+    "max": 1e-05
+  }
+}

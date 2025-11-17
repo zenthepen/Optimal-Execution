@@ -1,0 +1,20 @@
+{
+  "ticker": "SNAP",
+  "volatility_range": {
+    "min": 0.39178817748507655,
+    "max": 1.122429428913513
+  },
+  "trade_size_range": {
+    "min_shares": 4870,
+    "max_shares": 243525,
+    "adv_shares": 48705029
+  },
+  "time_horizon_range": {
+    "min_days": 0.5,
+    "max_days": 2.0
+  },
+  "risk_aversion_range": {
+    "min": 1e-07,
+    "max": 1e-05
+  }
+}
