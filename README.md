@@ -1,4 +1,4 @@
-# 🎯 Optimal Execution with Differential Evolution
+#  Optimal Execution with Differential Evolution
 
 **A production-ready library for institutional optimal execution strategies using global optimization.**
 
@@ -8,28 +8,28 @@
 
 ---
 
-## 📖 Overview
+##  Overview
 
 This library implements **globally optimal execution strategies** for large institutional orders, minimizing total trading costs through sophisticated market impact modeling. The Differential Evolution solver achieves a **5.7% improvement** over TWAP (Time-Weighted Average Price), validated against academic literature benchmarks.
 
 ### Key Features
 
-✅ **Literature-calibrated**: Implements Almgren-Chriss (2001) and Curato et al. (2014) frameworks  
-✅ **Global optimization**: Differential Evolution with 0% perturbation test failures  
-✅ **Realistic constraints**: 10-40% ADV limits (SEC RATS compliant)  
-✅ **Comprehensive testing**: 18 validation tests covering edge cases and real-world scenarios  
-✅ **Production-ready**: Handles extreme parameters without numerical instability  
-✅ **Easy calibration**: Automated parameter calibration from Yahoo Finance data
+ **Literature-calibrated**: Implements Almgren-Chriss (2001) and Curato et al. (2014) frameworks  
+ **Global optimization**: Differential Evolution with 0% perturbation test failures  
+ **Realistic constraints**: 10-40% ADV limits (SEC RATS compliant)  
+ **Comprehensive testing**: 18 validation tests covering edge cases and real-world scenarios  
+ **Production-ready**: Handles extreme parameters without numerical instability  
+ **Easy calibration**: Automated parameter calibration from Yahoo Finance data
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 optimal-execution-CLEAN/
 │
 ├── code/                      ← ALL PYTHON FILES
-│   ├── solver.py              ← MAIN (Differential Evolution) ✅ PRODUCTION
+│   ├── solver.py              ← MAIN (Differential Evolution) PRODUCTION
 │   ├── solver_sqp.py          ← SQP attempt (archived - 24% failures)
 │   ├── solver_dp.py           ← DP attempt (archived - 28% failures)
 │   ├── tests.py               ← 18 validation tests
@@ -104,11 +104,11 @@ python code/example.py
 python code/tests.py
 ```
 
-**Expected:** ✅ 18/18 tests pass, 5.7% improvement vs TWAP
+**Expected:** 18/18 tests pass, 5.7% improvement vs TWAP
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 Run the comprehensive test suite:
 
@@ -116,7 +116,7 @@ Run the comprehensive test suite:
 python code/tests.py
 ```
 
-**Test Results:** ✅ 18/18 passing (100% success rate)
+**Test Results:** 18/18 passing (100% success rate)
 
 The test suite validates:
 - Mathematical correctness (power law, spread, risk)
@@ -212,16 +212,16 @@ result = solver.solve()
 
 This repo includes **3 optimization approaches** to demonstrate rigorous methodology:
 
-1. **Dynamic Programming** (`code/solver_dp.py`) - ❌ 28% failures
-2. **Sequential Quadratic Programming** (`code/solver_sqp.py`) - ❌ 24% failures  
-3. **Differential Evolution** (`code/solver.py`) - ✅ 0% failures (PRODUCTION)
+1. **Dynamic Programming** (`code/solver_dp.py`) -  28% failures
+2. **Sequential Quadratic Programming** (`code/solver_sqp.py`) -  24% failures  
+3. **Differential Evolution** (`code/solver.py`) -  0% failures (PRODUCTION)
 
 **See [COMPARISON.md](COMPARISON.md) for full technical breakdown**
 
 
 ---
 
-## 📦 Requirements
+##  Requirements
 
 - Python 3.10+
 - NumPy < 2.0 (matplotlib compatibility)
@@ -234,7 +234,7 @@ See [`requirements.txt`](requirements.txt) for complete list.
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions welcome! Please:
 
@@ -268,23 +268,48 @@ If you use this code in academic research, please cite:
 
 ---
 
-## 🙏 Acknowledgments
+##  References
 
-- Almgren & Chriss (2001) for the foundational framework
-- Curato et al. (2014) for realistic market impact calibration
-- SciPy's Differential Evolution implementation
+This implementation is based on the following research:
+
+### Core Theory
+
+1. **Almgren, R., & Chriss, N.** (2001). Optimal execution of portfolio transactions. *Journal of Risk*, 3, 5-39.
+   - Foundation for optimal execution with market impact and risk aversion
+
+2. **Curato, G., Gatheral, J., & Lillo, F.** (2017). Optimal execution with nonlinear transient market impact. *Quantitative Finance*, 17(1), 41-54. Also available as arXiv:1412.4839.
+   - Nonlinear power-law impact with permanent and transient components
+   - **Link:** https://arxiv.org/abs/1412.4839
+
+3. **Gatheral, J.** (2010). No-dynamic-arbitrage and market impact. *Quantitative Finance*, 10(7), 749-759.
+   - Theory of transient impact and price resilience
+
+### Calibration Method
+
+4. **Zarinelli, E., Treccani, M., Farmer, J. D., & Lillo, F.** (2015). Beyond the square root: Evidence for logarithmic dependence of market impact on size and participation rate. *Market Microstructure and Liquidity*, 1(02), 1550004.
+   - Empirical calibration using log-log regression (used in `calibrate_impact_parameters.py`)
+
+### Optimization Algorithm
+
+5. **Storn, R., & Price, K.** (1997). Differential evolution–a simple and efficient heuristic for global optimization over continuous spaces. *Journal of Global Optimization*, 11(4), 341-359.
+   - Differential Evolution algorithm (primary solver in this implementation)
+
+### Almgren's Work (Extended)
+
+6. **Almgren, R.** (2003). Optimal execution with nonlinear impact functions and trading-enhanced risk. *Applied Mathematical Finance*, 10(1), 1-18.
+   - Extensions to the Almgren-Chriss model
 
 ---
 
-## 📧 Contact
+##  Contact
 
-- **Author:** Your Name
-- **Email:** your.email@example.com
-- **GitHub:** [@yourusername](https://github.com/yourusername)
+- **Author:** Arjyadeep Sen
+- **Email:** arjyadeepsen@gmail.com
+- **GitHub:** [@zenthepen](https://github.com/yourusername)
 
 ---
 
-## 📚 Additional Documentation
+##  Additional Documentation
 
 - **[NAVIGATION.md](NAVIGATION.md)** - Detailed folder guide
 - **[COMPARISON.md](COMPARISON.md)** - Solver comparison analysis
@@ -292,4 +317,4 @@ If you use this code in academic research, please cite:
 
 ---
 
-**Status:** ✅ Thesis-ready | Production-stable | Actively maintained
+**Status:**  Thesis-ready | Production-stable | Actively maintained
