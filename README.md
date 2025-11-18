@@ -268,36 +268,55 @@ If you use this code in academic research, please cite:
 
 ---
 
-##  References
+## References
 
-This implementation is based on the following research:
+This implementation is based on the following research papers:
 
-### Core Theory
+### Core Optimal Execution Theory
 
 1. **Almgren, R., & Chriss, N.** (2001). Optimal execution of portfolio transactions. *Journal of Risk*, 3, 5-39.
    - Foundation for optimal execution with market impact and risk aversion
+   - **Link:** https://www.smallake.kr/wp-content/uploads/2016/03/optliq.pdf
 
-2. **Curato, G., Gatheral, J., & Lillo, F.** (2017). Optimal execution with nonlinear transient market impact. *Quantitative Finance*, 17(1), 41-54. Also available as arXiv:1412.4839.
+2. **Bertsimas, D., & Lo, A. W.** (1998). Optimal control of execution costs. *Journal of Financial Markets*, 1(1), 1-50.
+   - Dynamic programming approach to execution optimization
+   - **Link:** https://www.mit.edu/~dbertsim/papers/Finance/Optimal%20control%20of%20execution%20costs.pdf
+
+3. **Curato, G., Gatheral, J., & Lillo, F.** (2017). Optimal execution with nonlinear transient market impact. *Quantitative Finance*, 17(1), 41-54. arXiv:1412.4839
    - Nonlinear power-law impact with permanent and transient components
    - **Link:** https://arxiv.org/abs/1412.4839
 
-3. **Gatheral, J.** (2010). No-dynamic-arbitrage and market impact. *Quantitative Finance*, 10(7), 749-759.
-   - Theory of transient impact and price resilience
+4. **Gatheral, J.** (2010). No-dynamic-arbitrage and market impact. *Quantitative Finance*, 10(7), 749-759. SSRN 1292353
+   - Theory of transient impact and price resilience, no-arbitrage conditions
+   - **Link:** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1292353
 
-### Calibration Method
+5. **Alfonsi, A., Fruth, A., & Schied, A.** (2010). Optimal execution strategies in limit order books with general shape functions. *Quantitative Finance*, 10(2), 143-157. arXiv:0708.1756
+   - Limit order book dynamics and resilience modes
+   - **Link:** https://arxiv.org/abs/0708.1756
 
-4. **Zarinelli, E., Treccani, M., Farmer, J. D., & Lillo, F.** (2015). Beyond the square root: Evidence for logarithmic dependence of market impact on size and participation rate. *Market Microstructure and Liquidity*, 1(02), 1550004.
+6. **Obizhaeva, A. A., & Wang, J.** (2013). Optimal trading strategy and supply/demand dynamics. *Journal of Financial Markets*, 16(1), 1-32. SSRN 1498514
+   - Block-shaped limit order book model with resilience
+   - **Link:** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1498514
+
+### Market Impact & Price Manipulation
+
+7. **Alfonsi, A., Schied, A., & Slynko, A.** (2012). Order book resilience, price manipulation, and the positive portfolio problem. *SIAM Journal on Financial Mathematics*, 3(1), 511-533. SSRN 1654151
+   - Transaction-triggered price manipulation and convexity conditions
+   - **Link:** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1654151
+
+8. **Zarinelli, E., Treccani, M., Farmer, J. D., & Lillo, F.** (2015). Beyond the square root: Evidence for logarithmic dependence of market impact on size and participation rate. *Market Microstructure and Liquidity*, 1(02), 1550004. arXiv:1412.2152
    - Empirical calibration using log-log regression (used in `calibrate_impact_parameters.py`)
+   - **Link:** https://arxiv.org/abs/1412.2152
 
 ### Optimization Algorithm
 
-5. **Storn, R., & Price, K.** (1997). Differential evolution–a simple and efficient heuristic for global optimization over continuous spaces. *Journal of Global Optimization*, 11(4), 341-359.
+9. **Storn, R., & Price, K.** (1997). Differential evolution–a simple and efficient heuristic for global optimization over continuous spaces. *Journal of Global Optimization*, 11(4), 341-359.
    - Differential Evolution algorithm (primary solver in this implementation)
 
-### Almgren's Work (Extended)
+### Additional Market Microstructure
 
-6. **Almgren, R.** (2003). Optimal execution with nonlinear impact functions and trading-enhanced risk. *Applied Mathematical Finance*, 10(1), 1-18.
-   - Extensions to the Almgren-Chriss model
+10. **[Additional paper from SSRN 3229719]** - Market microstructure reference
+    - **Link:** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3229719
 
 ---
 
