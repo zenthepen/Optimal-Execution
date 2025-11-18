@@ -208,7 +208,7 @@ result = solver.solve()
 
 ---
 
-## 🎯 Why 3 Solvers? (For Interviews)
+## 🎯 Why 3 Solvers?
 
 This repo includes **3 optimization approaches** to demonstrate rigorous methodology:
 
@@ -216,9 +216,8 @@ This repo includes **3 optimization approaches** to demonstrate rigorous methodo
 2. **Sequential Quadratic Programming** (`code/solver_sqp.py`) - ❌ 24% failures  
 3. **Differential Evolution** (`code/solver.py`) - ✅ 0% failures (PRODUCTION)
 
-**See [COMPARISON.md](COMPARISON.md) for full technical breakdown** - perfect for recruiter discussions!
+**See [COMPARISON.md](COMPARISON.md) for full technical breakdown**
 
-**Key Talking Point:** *"I systematically explored three optimization methods, validated each through perturbation testing, and chose the one with provably optimal results."*
 
 ---
 
