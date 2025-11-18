@@ -315,8 +315,11 @@ This implementation is based on the following research papers:
 
 ### Additional Market Microstructure
 
-10. **[Additional paper from SSRN 3229719]** - Market microstructure reference
-    - **Link:** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3229719
+10. **Frazzini, A., Israel, R., & Moskowitz, T. J.** (2018). Trading Costs. *SSRN Working Paper No. 3229719*.
+    - Empirical analysis of transaction costs and implementation shortfall
+    - **Link:** https://ssrn.com/abstract=3229719
+    - **DOI:** http://dx.doi.org/10.2139/ssrn.3229719
+
 
 ---
 
