@@ -343,8 +343,8 @@ with boundary condition $V_N(0) = 0$.
     - **Store optimal:**
       - $V_i(X_i) = \min_{S_i} Q(S_i)$
       - $S_i^*(X_i) = \arg\min_{S_i} Q(S_i)$
-- **Forward pass:** Start with $X_0$, apply $S_1^*(X_0)$, then $S_2^*(X_1)$, etc.
-
+- **Forward pass:** Start with $X_0$, apply $S_1^{\ast}(X_0)$, then $S_2^{\ast}(X_1)$, etc.
+  
 #### 3.2.3 Why DP Fails for Our Problem
 
 **Issue 1: Continuous state space**
