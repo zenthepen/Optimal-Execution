@@ -39,14 +39,8 @@ $$\boxed{\mathcal{C}(S) = \underbrace{\sum_{i=1}^{N} C_i^{\text{impact}}(S)}_{\t
 **Feasible set:**
 
 $$
-\mathcal{S} = 
-\left\{ 
-S \in \mathbb{R}^N \;:\; 
-\sum_{i=1}^{N} S_i = X_0,\;\; 
-0 \le S_i \le \bar{S}_i \;\; \forall i 
-\right\}
+\mathcal{S} = \\{ S \in \mathbb{R}^N : \sum_{i=1}^{N} S_i = X_0, \, 0 \le S_i \le \bar{S}_i \, \forall i \\}
 $$
-
 
 **Constraint 1: Complete execution**
 
@@ -271,7 +265,7 @@ $$p_i(S) = \sum_{j=1}^{i-1} e^{-\rho(i-j)\tau} \eta_{\text{trans}} |S_j|^\gamma 
 
 **Dimensions check:**
 
-$$[\text{Cost}] = [\text{\$}] = [\text{\$/share}] \times [\text{shares}] \quad \checkmark$$
+$$[\text{Cost}] = [\$] = [\$/\text{share}] \times [\text{shares}] \quad \checkmark$$
 
 ---
 
@@ -285,7 +279,7 @@ $$\min_{S \in \mathcal{S}} \quad \mathcal{C}(S) = S_0 \sum_{i=1}^{N} \left[ S_i 
 
 Subject to:
 
-$$\mathcal{S} = \left\{ S \in \mathbb{R}^N : \sum_{i=1}^{N} S_i = X_0, \; 0 \leq S_i \leq \bar{S} \right\}$$
+$$\mathcal{S} = \{ S \in \mathbb{R}^N : \sum_{i=1}^{N} S_i = X_0, \; 0 \leq S_i \leq \bar{S} \}$$
 
 **Why this problem is hard:**
 
@@ -320,7 +314,7 @@ $$V(x, t) = \min_{\{S_s\}_{s \in [t, T]}} \mathbb{E}\left[ \int_t^T \mathcal{C}_
 
 **Hamilton-Jacobi-Bellman (HJB) equation:**
 
-$$\frac{\partial V}{\partial t} + \min_{S_t} \left\{ \mathcal{C}_t(S_t) + \frac{\partial V}{\partial x} \dot{x} + \frac{1}{2} \sigma^2 x^2 \frac{\partial^2 V}{\partial x^2} \right\} = 0$$
+$$\frac{\partial V}{\partial t} + \min_{S_t} \left( \mathcal{C}_t(S_t) + \frac{\partial V}{\partial x} \dot{x} + \frac{1}{2} \sigma^2 x^2 \frac{\partial^2 V}{\partial x^2} \right) = 0$$
 
 with terminal condition $V(0, T) = 0$.
 
@@ -328,7 +322,7 @@ with terminal condition $V(0, T) = 0$.
 
 Backward recursion:
 
-$$V_i(X_i) = \min_{0 \leq S_i \leq \min(X_i, \bar{S})} \left\{ C_i(S_i, X_i) + V_{i+1}(X_i - S_i) \right\}$$
+$$V_i(X_i) = \min_{0 \leq S_i \leq \min(X_i, \bar{S})} \left( C_i(S_i, X_i) + V_{i+1}(X_i - S_i) \right)$$
 
 with boundary condition $V_N(0) = 0$.
 
@@ -338,25 +332,18 @@ with boundary condition $V_N(0) = 0$.
 
 **Backward Dynamic Programming:**
 
-Initialize: V_N(0) = 0
 
-- For i = N-1, N-2, ..., 1:
-- For each inventory level X_i in grid:
-
-- For each possible trade S_i in [0, min(X_i, S_max)]:
-   
-- Compute cost: C_i(S_i, X_i)
-   
-- Compute value-to-go: V_i+1(X_i - S_i)
-   
-- Total: Q(S_i) = C_i + V_i+1(X_i - S_i)
-    
-- Store optimal:
- V_i(X_i) = min_S Q(S_i)
-    
-S_i*(X_i) = argmin_S Q(S_i)
-
-Forward pass: Start with X_0, apply S_1*(X_0), then S_2*(X_1), etc.
+- **Initialize:** $V_N(0) = 0$
+- **For** $i = N-1, N-2, \ldots, 1$:
+  - **For** each inventory level $X_i$ in grid:
+    - **For** each possible trade $S_i \in [0, \min(X_i, \bar{S})]$:
+      - Compute cost: $C_i(S_i, X_i)$
+      - Compute value-to-go: $V_{i+1}(X_i - S_i)$
+      - Total: $Q(S_i) = C_i + V_{i+1}(X_i - S_i)$
+    - **Store optimal:**
+      - $V_i(X_i) = \min_{S_i} Q(S_i)$
+      - $S_i^*(X_i) = \arg\min_{S_i} Q(S_i)$
+- **Forward pass:** Start with $X_0$, apply $S_1^*(X_0)$, then $S_2^*(X_1)$, etc.
 
 #### 3.2.3 Why DP Fails for Our Problem
 
@@ -512,7 +499,9 @@ $$\text{ADV} = \frac{1}{T} \sum_{t=1}^T V_t$$
 
 Perturb parameters by $\pm 10\%$, verify cost change < 5%:
 
-$$\Delta(\epsilon) = \frac{\mathcal{C}(S_{\epsilon}^{*}) - \mathcal{C}(S^{*})}{\mathcal{C}(S^{*})} < 0.05$$
+$$
+\Delta(\epsilon) = \frac{\mathcal{C}(S_{\epsilon}^{\ast}) - \mathcal{C}(S^{\ast})}{\mathcal{C}(S^{\ast})} < 0.05
+$$
 
 **Tier 3: Monte Carlo validation**
 
