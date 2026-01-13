@@ -1,13 +1,11 @@
 """
 Simple Example: Optimal Execution Solver
 
-This example shows how to use the solver in 3 simple steps.
+This example shows how to use the solver.
 """
 
 import sys
 import numpy as np
-
-# Import the solver
 from solver import OptimalExecutionRealistic
 
 
@@ -18,8 +16,6 @@ def main():
     print("OPTIMAL EXECUTION SOLVER - EXAMPLE")
     print("=" * 60)
     print()
-    
-    # Step 1: Create solver with SNAP stock parameters
     print("Step 1: Initializing solver...")
     print("  - Order size: 100,000 shares")
     print("  - Time horizon: 1 day (10 periods)")
@@ -36,37 +32,33 @@ def main():
         gamma=0.67,             # Power law exponent
         S0=10.0                 # Initial stock price: $10
     )
-    
-    # Step 2: Solve for optimal strategy
     print("Step 2: Solving optimization problem...")
     print("  (Using Differential Evolution global optimizer)")
     print()
     
     result = solver.solve()
-    
-    # Step 3: Display results
     print("=" * 60)
     print("RESULTS")
     print("=" * 60)
     print()
     
-    print(f"✅ Status: {result['status']}")
-    print(f"   Iterations: {result['iterations']}")
-    print(f"   Function Evaluations: {result['function_evals']}")
+    print(f"Status: {result['status']}")
+    print(f"Iterations: {result['iterations']}")
+    print(f"Function Evaluations: {result['function_evals']}")
     print()
     
-    print(f"💰 COSTS")
+    print(f"COSTS")
     print(f"   Total Cost:  ${result['total_cost']:.2f}")
     print(f"   - Impact:    ${result['impact_cost']:.2f} ({result['impact_cost']/result['total_cost']*100:.1f}%)")
     print(f"   - Spread:    ${result['spread_cost']:.2f} ({result['spread_cost']/result['total_cost']*100:.1f}%)")
     print(f"   - Risk:      ${result['risk_cost']:.2f} ({result['risk_cost']/result['total_cost']*100:.1f}%)")
     print()
     
-    print(f"📊 PERFORMANCE")
+    print(f"PERFORMANCE")
     print(f"   Improvement vs TWAP: {result['improvement_vs_twap']:.2f}%")
     print()
     
-    print("📈 OPTIMAL EXECUTION SCHEDULE")
+    print(" OPTIMAL EXECUTION SCHEDULE")
     print("   Period | Shares     | % of Total | Remaining")
     print("   " + "-" * 50)
     
@@ -94,13 +86,13 @@ def main():
 if __name__ == "__main__":
     try:
         result = main()
-        print("\n✅ Example completed successfully!")
+        print("\nExample completed successfully!")
         print("\nNext steps:")
         print("  - Run tests: python tests.py")
         print("  - View results: ls results/")
         print("  - Read theory: cat theory.md")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n Error: {e}")
         print("\nMake sure you have installed all dependencies:")
         print("  pip install numpy scipy matplotlib pandas yfinance")
         sys.exit(1)
