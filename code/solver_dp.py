@@ -7,16 +7,11 @@ import time
 from scipy.interpolate import RectBivariateSpline
 from resilience_models import ExponentialResilience, PowerLawResilience, LinearResilience, GaussianResilience
 
-# TASK 2: Improved matplotlib settings for publication quality
 sns.set_style("whitegrid")
 plt.rcParams['figure.dpi'] = 150
 plt.rcParams['font.size'] = 11
 plt.rcParams['axes.linewidth'] = 1.5
 plt.rcParams['lines.linewidth'] = 2.5
-
-# ============================================================================
-# CORE FUNCTIONS
-# ============================================================================
 
 def make_grid(T: float, N: int, X0: float, M: int):
     tau = T/N
@@ -29,10 +24,6 @@ def make_grid(T: float, N: int, X0: float, M: int):
         assert np.isclose(x[0], 0.0) and np.isclose(x[-1], X0)
     return tk, x, tau, dx
 
-
-# ============================================================================
-# IMPACT MODELS
-# ============================================================================
 
 class ImpactModel:
     def compute(self, S):
@@ -68,11 +59,10 @@ class powerImpact(ImpactModel):
     def __init__(self, eta, gamma, S0=1.0):
         self.eta = eta
         self.gamma = gamma
-        self.S0 = S0  # Stock price for return-to-dollar conversion
+        self.S0 = S0 
     
     def compute(self, S):
-        # Convert return impact to dollar impact
-        # η gives return per volume^γ, multiply by S^(γ+1) * S0 for dollars
+
         return self.eta * np.abs(S)**(self.gamma + 1) * self.S0
     
     @property
@@ -104,11 +94,9 @@ class powerlawLOB(ImpactModel):
         else:
             factor = 1+((1 - self.alpha)*(np.abs(S) / self.A))
             if factor <= 0:
-                return np.inf  # Numerical safeguard
+                return np.inf 
 
             p_star = factor**(1 / (1 - self.alpha)) - 1
-
-            # Cost = A * p*^(2-alpha) / (2-alpha)
             cost = (self.A * p_star**(2 - self.alpha)) / (2 - self.alpha)
             
             return cost
@@ -173,13 +161,9 @@ class TransientImpactModel:
         return f"Transient({self.shape}, {self.resilience.name})"
 
 
-# ============================================================================
-# FIXED CALIBRATION - CRITICAL FIX #1
-# ============================================================================
-
 def get_empirical_eta(gamma, asset='AAPL'):
     """
-    ✅ RESEARCH-BACKED: Get empirical eta values from Zarinelli calibration results.
+    Get empirical eta values from Zarinelli calibration results.
     
     Based on actual market data calibration results:
     - AAPL: η = 3.20×10⁻⁶, γ = 0.500, R² = 0.209 (square-root impact)
@@ -188,7 +172,6 @@ def get_empirical_eta(gamma, asset='AAPL'):
     For different gamma values, we use power-law scaling: η ∝ V^(γ₀-γ)
     where γ₀ is the empirically observed exponent.
     """
-    # Empirical results from Zarinelli log-log regression
     empirical_data = {
         'AAPL': {'eta_base': 3.20e-6, 'gamma_empirical': 0.500, 'volume_ref': 30e6},
         'NVDA': {'eta_base': 6.24e-6, 'gamma_empirical': 1.000, 'volume_ref': 130e6},  # FIXED: e-6 not e-11
@@ -196,33 +179,25 @@ def get_empirical_eta(gamma, asset='AAPL'):
     }
     
     if asset not in empirical_data:
-        asset = 'AAPL'  # Default fallback
+        asset = 'AAPL'  
     
     data = empirical_data[asset]
     eta_base = data['eta_base']
     gamma_emp = data['gamma_empirical']
     
-    # For different gamma, scale by volume term difference
-    # If we observe η₀ at γ₀, then η(γ) = η₀ × (V_ref)^(γ₀-γ)
-    V_ref = data['volume_ref'] / 100  # Reference trade size (1% daily volume)
+    V_ref = data['volume_ref'] / 100
     
     if np.isclose(gamma, gamma_emp, atol=0.1):
         return eta_base
     else:
-        # Scale for different gamma using power-law relationship
         eta_scaled = eta_base * (V_ref ** (gamma_emp - gamma))
-        return max(1e-8, min(1e-3, eta_scaled))  # Keep in reasonable range
+        return max(1e-8, min(1e-3, eta_scaled))
 
-
-# Create alias for backward compatibility
 calibrate_eta = get_empirical_eta
 
 
 def verify_calibration(gammas, X0=100000, N=100, base_eta=2.5e-6):
-    """
-    ⚠️ LEGACY: Verification function using fixed parameters.
-    NOTE: base_eta is arbitrary - for comparison purposes only.
-    """
+   
     print("\n" + "="*70)
     print("CALIBRATION VERIFICATION (LEGACY - FIXED PARAMETERS)")
     print("="*70)
@@ -237,7 +212,7 @@ def verify_calibration(gammas, X0=100000, N=100, base_eta=2.5e-6):
     base_total = None
     for gamma in gammas:
         # Use fixed eta for comparison only
-        eta = base_eta  # Fixed value for all gammas
+        eta = base_eta  
         impact_per_trade = eta * (S_twap ** gamma)
         total_impact = N * impact_per_trade
         
@@ -249,13 +224,8 @@ def verify_calibration(gammas, X0=100000, N=100, base_eta=2.5e-6):
         
         print(f"{gamma:<8.1f} {eta:<15.2e} {impact_per_trade:<15.4f} {total_impact:<15.2f} {ratio:<15.3f}")
     
-    print("\n⚠️  Note: This uses arbitrary fixed eta values for comparison only")
+    print("\n Note: This uses arbitrary fixed eta values for comparison only")
     print("   For actual calibration, use data-driven methods (Zarinelli, Almgren-Chriss)\n")
-
-
-# ============================================================================
-# IMPROVED DP SOLVER - CRITICAL FIX #2 and #3
-# ============================================================================
 
 def stage_cost(x, S, tau, sigma, lam, impact_model):
     """
@@ -268,7 +238,7 @@ def stage_cost(x, S, tau, sigma, lam, impact_model):
     Note: The 0.5 factor is CRITICAL - it comes from the variance of price changes.
     """
     impact_cost = impact_model.compute(S)
-    volatility_cost = 0.5 * lam * sigma**2 * x**2 * tau  # CRITICAL: 0.5 factor!
+    volatility_cost = 0.5 * lam * sigma**2 * x**2 * tau 
     return impact_cost + volatility_cost
 
 
@@ -277,7 +247,6 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
     """
     Enhanced DP solver with fixes for numerical stability.
     
-    CRITICAL FIXES APPLIED:
     1. Terminal penalty: 10.0 (was 1e9) - prevents cost explosion
     2. Quadratic terminal penalty: x^2 (was x) - proper penalty structure
     3. Adaptive control grid refinement - improves accuracy near optimal actions
@@ -302,18 +271,14 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
     """
     N = len(tk) - 1
     M = len(x_grid) - 1
-    
-    # Base control grid
+
     S_grid = np.linspace(0, S_max, K, dtype=float)
-    
     V = np.zeros((N+1, M+1), dtype=float)
     policy = np.zeros((N, M+1), dtype=float)
-    
-    # FIX #2: FIXED terminal penalty - quadratic penalty for consistency
     V[N, :] = terminal_penalty * x_grid**2
     V[N, 0] = 0.0
     
-    max_cost_change = 0.0  # For diagnostics
+    max_cost_change = 0.0 
     
     for i in range(N-1, -1, -1):
         stage_max_change = 0.0
@@ -326,12 +291,9 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                 policy[i, j] = 0.0
                 continue
             
-            # FIX #3: Adaptive control grid refinement
             if adaptive_control and x_curr > 0:
-                # Local refinement around likely optimal trade sizes
                 local_S_max = min(S_max, x_curr)
-                # Add 10 extra points near suggested trade size
-                suggested_S = x_curr / (N - i)  # Naive uniform spreading
+                suggested_S = x_curr / (N - i) 
                 local_grid = np.linspace(max(0, suggested_S*0.5), 
                                         min(local_S_max, suggested_S*2), 10)
                 S_grid_augmented = np.unique(np.concatenate([S_grid, local_grid]))
@@ -347,8 +309,6 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                     continue
                     
                 x_next = x_curr - S
-                
-                # Interpolate V[i+1, x_next]
                 if x_next <= 0:
                     V_next = V[i+1, 0]
                 elif x_next >= x_grid[-1]:
@@ -368,8 +328,6 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                             weight = (x_next - x_left) / (x_right - x_left)
                             V_next = (1 - weight) * V[i+1, idx-1] + weight * V[i+1, idx]
                 
-                # Stage cost - CRITICAL FIX: Use x_next (inventory AFTER trade) for volatility!
-                # The volatility cost during period [k, k+1] depends on inventory held, which is x_next.
                 immediate_cost = stage_cost(x_next, S, tau, sigma, lam, impact_model)
                 total_cost = immediate_cost + V_next
                 
@@ -377,7 +335,6 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                     best_cost = total_cost
                     best_s = S
             
-            # Track convergence
             if j > 0:
                 cost_change = abs(best_cost - V[i, j-1])
                 stage_max_change = max(stage_max_change, cost_change)
@@ -386,12 +343,9 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
             policy[i, j] = best_s
         
         max_cost_change = max(max_cost_change, stage_max_change)
-    
-    # CRITICAL FIX: Enforce terminal constraint - force complete liquidation in final period
-    # This guarantees x[N] = 0 and eliminates terminal penalty cost
     for j in range(M+1):
         if x_grid[j] > 0:
-            policy[N-1, j] = x_grid[j]  # Sell all remaining inventory
+            policy[N-1, j] = x_grid[j] 
     
     if verbose:
         print(f"  Max cost change: {max_cost_change:.2e}")
@@ -399,14 +353,9 @@ def dp_solver_robust(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
     
     return V, policy
 
-
-# Alias for compatibility
 solve_dp = dp_solver_robust
 
 
-# ============================================================================
-# DUAL CONTROL DP SOLVER - NEW FEATURE
-# ============================================================================
 
 def safe_interpolate(x_val, x_grid, y_values):
     """
@@ -420,22 +369,17 @@ def safe_interpolate(x_val, x_grid, y_values):
     Returns:
         Interpolated value with safe boundary handling
     """
-    # Clamp to grid boundaries
     if x_val <= x_grid[0]:
         return y_values[0]
     elif x_val >= x_grid[-1]:
         return y_values[-1]
-    
-    # Use linear interpolation for interior points
     try:
         result = np.interp(x_val, x_grid, y_values)
         if not np.isfinite(result):
-            # Fall back to nearest neighbor if interpolation fails
             idx = np.argmin(np.abs(x_grid - x_val))
             return y_values[idx]
         return result
     except:
-        # Emergency fallback to nearest neighbor
         idx = np.argmin(np.abs(x_grid - x_val))
         return y_values[idx]
 
@@ -443,17 +387,7 @@ def safe_interpolate(x_val, x_grid, y_values):
 def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                           terminal_penalty=10.0, limit_fill_prob=0.5, 
                           bid_ask_spread=0.001, adaptive_control=True, verbose=False):
-    """
-    FIXED Enhanced DP solver with dual control: Market orders + Limit orders.
-    
-    CRITICAL FIXES APPLIED:
-    1. Terminal penalty: 10.0 (was 1e6) - prevents cost explosion
-    2. Quadratic terminal penalty: x^2 (was x) - proper penalty structure  
-    3. Conservative order sizing: 90% of inventory - prevents overshoots
-    
-    Market orders: Execute immediately with impact cost + spread cost
-    Limit orders: Execute with probability p, no impact cost, no spread cost
-    
+"""
     Args:
         tk: Time grid [N+1]
         x_grid: Inventory grid [M+1] 
@@ -480,22 +414,16 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
     p = limit_fill_prob
     s = bid_ask_spread
     
-    # Initialize arrays
     V = np.zeros((N+1, M+1))
     policy_M = np.zeros((N+1, M+1))
     policy_L = np.zeros((N+1, M+1))
-    
-    # Terminal condition: V_N(x) = terminal_penalty * x^2 (FIXED: quadratic penalty)
     V[N, :] = terminal_penalty * x_grid**2
-    V[N, 0] = 0.0  # No cost for zero inventory
+    V[N, 0] = 0.0  
     
-    # Create control grids with improved smoothness
+  
     if adaptive_control:
-        # FIXED: Better grid sizing for smoother policies
-        K_dual = min(K, 25)  # Balanced between accuracy and computational cost
-        # IMPORTANT: Always include zero action (do nothing)
+        K_dual = min(K, 25)  
         S_grid = np.linspace(0, S_max, K_dual)
-        # Ensure zero is exactly represented
         S_grid[0] = 0.0
     else:
         K_dual = K
@@ -506,7 +434,6 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
         print(f"Dual Control DP: N={N}, M={M}, K={K_dual} (O(N×M×K²) = {N*M*K_dual**2:,})")
         print(f"Limit fill probability: {p:.1%}, Spread: {s:.3f}")
     
-    # Backward induction
     for i in range(N-1, -1, -1):
         if verbose and i % 10 == 0:
             print(f"  Step {i}/{N-1}")
@@ -514,13 +441,12 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
         for j in range(M+1):
             x = x_grid[j]
             
-            if x <= 1e-6:  # No inventory left
+            if x <= 1e-6: 
                 V[i, j] = 0
                 policy_M[i, j] = 0
                 policy_L[i, j] = 0
                 continue
             
-            # TASK 1: Fix Terminal Trading Spike - Smooth urgency factor
             time_to_maturity = tk[-1] - tk[i]
             time_progress = (tk[-1] - time_to_maturity) / tk[-1]
             urgency_factor = 1.0 + 2.0 * (time_progress ** 2)
@@ -531,87 +457,57 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
             best_cost = np.inf
             best_vM, best_vL = 0, 0
             
-            # Double loop over market and limit orders with SMOOTH sizing
             for vM in S_grid:
-                # Apply urgency factor for smooth terminal behavior
                 max_market_order = min(x * 0.9 * urgency_factor, x - 1e-6)
                 if vM > max_market_order:
                     continue
                 
                 for vL in S_grid:
-                    # Apply urgency factor for smooth total order sizing
                     max_total_orders = min(x * 0.9 * urgency_factor, x - 1e-6)
                     if vM + vL > max_total_orders:
                         continue
-                    
-                    # === IMMEDIATE COSTS ===
-                    
-                    # 1. Market impact cost (only for market orders)
+        
                     impact_cost = impact_model.compute(vM) if vM > 1e-12 else 0
-                    
-                    # 2. Spread cost (only for market orders) 
-                    spread_cost = s * vM  # Half-spread cost per share
-                    
-                    # 3. Risk cost (inventory holding risk)
-                    # CRITICAL FIX: Use inventory AFTER trades (x_after) and include 0.5 factor!
-                    # Compute expected inventory after both market and limit orders
-                    # With probability p: limit fills, inventory = x - vM - vL
-                    # With probability 1-p: limit doesn't fill, inventory = x - vM
-                    # Expected inventory after = p*(x - vM - vL) + (1-p)*(x - vM) = x - vM - p*vL
+                    spread_cost = s * vM 
                     x_after_expected = x - vM - p * vL
                     risk_cost = 0.5 * lam * (sigma ** 2) * (x_after_expected ** 2) * tau
                     
                     immediate_cost = impact_cost + spread_cost + risk_cost
-                    
-                    # === EXPECTED FUTURE COSTS ===
-                    
-                    # FIXED: Safe interpolation with boundary checking
-                    # State 1: Limit order fills (probability p)
                     x_fill = max(0, x - vM - vL)
                     V_fill = safe_interpolate(x_fill, x_grid, V[i+1, :])
-                    
-                    # State 2: Limit order doesn't fill (probability 1-p)  
                     x_no_fill = max(0, x - vM)
                     V_no_fill = safe_interpolate(x_no_fill, x_grid, V[i+1, :])
-                    
-                    # Expected future cost
                     expected_future_cost = p * V_fill + (1 - p) * V_no_fill
-                    
-                    # === TOTAL COST (BELLMAN EQUATION) ===
+        
                     total_cost = immediate_cost + expected_future_cost
                     
-                    # FIXED: Check for numerical issues
                     if not np.isfinite(total_cost):
                         continue
-                    
-                    # Update best policy
+        
                     if total_cost < best_cost:
                         best_cost = total_cost
                         best_vM = vM
                         best_vL = vL
             
-            # Store optimal solution with safety checks
             if np.isfinite(best_cost) and best_cost < np.inf:
                 V[i, j] = best_cost
                 policy_M[i, j] = best_vM
                 policy_L[i, j] = best_vL
             else:
-                # Fallback: use terminal penalty scaled by remaining inventory (FIXED: quadratic)
                 V[i, j] = terminal_penalty * x**2
-                policy_M[i, j] = min(x, S_max)  # Liquidate as much as possible
+                policy_M[i, j] = min(x, S_max) 
                 policy_L[i, j] = 0
     
     if verbose:
         print(f"Dual control DP solver completed. Initial cost: {V[0, -1]:.2f}")
         
-        # CRITICAL FIX #5: Post-solve validation
-        print(f"\n🔍 CONSTRAINT VALIDATION:")
+        print(f"\n CONSTRAINT VALIDATION:")
         violations = []
         for i in range(N+1):
             for j in range(M+1):
                 x = x_grid[j]
                 total_order = policy_M[i, j] + policy_L[i, j]
-                if total_order > x + 1e-6:  # Tolerance for numerical error
+                if total_order > x + 1e-6: 
                     violations.append({
                         'time': i,
                         'inventory': x,
@@ -620,7 +516,7 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                     })
         
         if violations:
-            print(f"   ❌ Found {len(violations)} constraint violations!")
+            print(f"   Found {len(violations)} constraint violations!")
             print(f"   Max excess: {max(v['excess'] for v in violations):.4f}")
             # Clip violations
             for i in range(N+1):
@@ -632,9 +528,9 @@ def dp_solver_dual_control(tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
                         scale = x / total
                         policy_M[i, j] *= scale
                         policy_L[i, j] *= scale
-            print(f"   ✅ Violations clipped to respect constraints")
+            print(f"   Violations clipped to respect constraints")
         else:
-            print(f"   ✅ No constraint violations detected")
+            print(f"   No constraint violations detected")
     
     return V, policy_M, policy_L
 
@@ -654,18 +550,16 @@ def validate_execution_path(executed_shares, target_inventory, tolerance=0.01):
     cumulative = np.cumsum(executed_shares)
     total_executed = cumulative[-1]
     
-    # Check completion
     deviation = abs(total_executed - target_inventory) / target_inventory
     assert deviation < tolerance, \
         f"Execution incomplete: {total_executed:,.0f} vs {target_inventory:,.0f} " \
         f"(deviation: {deviation*100:.2f}%)"
     
-    # Check no over-execution at any step
     remaining = target_inventory - cumulative
     assert np.all(remaining >= -tolerance * target_inventory), \
         f"Over-execution detected: {remaining.min():,.0f} remaining"
     
-    print(f"✅ Execution validation passed:")
+    print(f" Execution validation passed:")
     print(f"   Target: {target_inventory:,.0f} shares")
     print(f"   Executed: {total_executed:,.0f} shares ({deviation*100:.3f}% deviation)")
     return True
@@ -703,33 +597,25 @@ def simulate_dual_control_path(policy_M, policy_L, x_grid, X0, tau,
     for i in range(N):
         x_current = x_path[i]
         
-        # Get optimal controls by interpolation
         vM_opt = np.interp(x_current, x_grid, policy_M[i, :])
-        vL_opt = np.interp(x_current, x_grid, policy_L[i, :])
-        
+        vL_opt = np.interp(x_current, x_grid, policy_L[i, :])     
         S_M_path[i] = vM_opt
         S_L_path[i] = vL_opt
         
-        # Simulate limit order fill
         if stochastic:
-            # Stochastic simulation: random fill
             limit_fills = vL_opt * (np.random.random() < limit_fill_prob)
         else:
-            # Deterministic simulation: expected fill
             limit_fills = vL_opt * limit_fill_prob
         
         L_fill_path[i] = limit_fills
         
-        # Update inventory
         x_path[i + 1] = x_current - vM_opt - limit_fills
-        x_path[i + 1] = max(0, x_path[i + 1])  # Ensure non-negative
-    
-    # CRITICAL FIX #5: Validate execution path
+        x_path[i + 1] = max(0, x_path[i + 1])
     executed_shares = S_M_path + L_fill_path
     try:
-        validate_execution_path(executed_shares, X0, tolerance=0.05)  # 5% tolerance for stochastic fills
+        validate_execution_path(executed_shares, X0, tolerance=0.05) 
     except AssertionError as e:
-        print(f"⚠️  Execution validation warning: {e}")
+        print(f"Execution validation warning: {e}")
     
     return x_path, S_M_path, S_L_path, L_fill_path
 
@@ -770,29 +656,24 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
     N = len(tk) - 1
     M = len(x_grid) - 1
     P = len(p_grid) - 1
-    
-    # Initialize value function: V[k, i, j] = value at time k, inventory i, price displacement j
     V = np.zeros((N + 1, M + 1, P + 1))
     vM_opt = np.zeros((N, M + 1, P + 1))
     vL_opt = np.zeros((N, M + 1, P + 1))
     
-    # Terminal condition with inventory penalty
     for i in range(M + 1):
         for j in range(P + 1):
             x_val = x_grid[i]
             p_val = p_grid[j]
             
-            # Terminal penalty: quadratic inventory + price displacement cost
-            # Urgency factor increases near terminal
             time_progress = tk[N] / tk[N] if tk[N] > 0 else 1.0
             urgency_factor = 1.0 + 2.0 * (time_progress ** 2)
             
             inventory_penalty = terminal_penalty_scale * urgency_factor * x_val**2
-            displacement_penalty = 0.5 * p_val**2  # Cost of being away from fair price
+            displacement_penalty = 0.5 * p_val**2  
             
             V[N, i, j] = -(inventory_penalty + displacement_penalty)
     
-    # Backward induction
+  
     for k in range(N - 1, -1, -1):
         print(f"Solving time step {k}/{N-1}")
         
@@ -802,7 +683,6 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
                 p_current = p_grid[j]
                 
                 if x_current <= 1e-6:
-                    # No inventory left
                     V[k, i, j] = V[k+1, i, j]
                     vM_opt[k, i, j] = 0
                     vL_opt[k, i, j] = 0
@@ -812,39 +692,29 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
                 best_vM = 0
                 best_vL = 0
                 
-                # Search over market orders
                 vM_values = np.linspace(0, min(S_max, x_current), 21)
                 
                 for vM in vM_values:
-                    # Search over limit orders (given market order)
                     remaining_inventory = x_current - vM
                     vL_values = np.linspace(0, min(S_max, remaining_inventory), 11)
                     
                     for vL in vL_values:
-                        # Immediate costs
                         market_impact = transient_model.permanent_impact(vM) + transient_model.transient_impact(vM)
-                        limit_spread_cost = K * vL  # Spread cost for limit orders
+                        limit_spread_cost = K * vL  
                         bid_ask_cost = bid_ask_spread * (vM + vL * limit_fill_prob)
                         
                         immediate_cost = market_impact + limit_spread_cost + bid_ask_cost
                         
-                        # Price evolution
-                        # Permanent impact accumulates
                         permanent_displacement = transient_model.permanent_impact(vM)
-                        # Transient impact decays + new transient from market order
                         transient_decay = transient_model.evolve_price_displacement(p_current, tau)
                         new_transient = transient_model.transient_impact(vM)
                         p_next = transient_decay + permanent_displacement + new_transient
-                        
-                        # Inventory evolution
                         expected_limit_fill = vL * limit_fill_prob
                         x_next = x_current - vM - expected_limit_fill
-                        x_next = max(0, x_next)  # Non-negative constraint
-                        
-                        # Risk cost (variance penalty)
+                        x_next = max(0, x_next)  
+                
                         risk_cost = lam * sigma**2 * x_current**2 * tau
                         
-                        # Interpolate continuation value
                         if x_next <= x_grid[0]:
                             i_next = 0
                         elif x_next >= x_grid[-1]:
@@ -852,7 +722,6 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
                         else:
                             i_next = np.searchsorted(x_grid, x_next)
                             if i_next > 0:
-                                # Linear interpolation
                                 alpha = (x_next - x_grid[i_next-1]) / (x_grid[i_next] - x_grid[i_next-1])
                                 i_next = i_next - 1 + alpha
                         
@@ -863,15 +732,14 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
                         else:
                             j_next = np.searchsorted(p_grid, p_next)
                             if j_next > 0:
-                                # Linear interpolation
+                               
                                 beta = (p_next - p_grid[j_next-1]) / (p_grid[j_next] - p_grid[j_next-1])
                                 j_next = j_next - 1 + beta
                         
-                        # Use bilinear interpolation for continuation value
+                    
                         if isinstance(i_next, (int, np.integer)) and isinstance(j_next, (int, np.integer)):
                             continuation_value = V[k+1, int(i_next), int(j_next)]
                         else:
-                            # Bilinear interpolation
                             i_low = int(np.floor(i_next))
                             i_high = min(i_low + 1, M)
                             j_low = int(np.floor(j_next))
@@ -888,7 +756,7 @@ def dp_solver_with_memory(tk, x_grid, p_grid, tau, S_max, K, sigma, lam,
                             continuation_value = ((1-alpha)*(1-beta)*v00 + (1-alpha)*beta*v01 + 
                                                 alpha*(1-beta)*v10 + alpha*beta*v11)
                         
-                        # Total value
+                     
                         total_value = -immediate_cost - risk_cost + continuation_value
                         
                         if total_value > best_value:
@@ -908,9 +776,6 @@ def solve_optimal_execution(solver_type='single', impact_model=None, X0=100000,
                            limit_fill_prob=0.5, bid_ask_spread=0.002, verbose=True):
     """
     Unified interface for choosing between single and dual control DP solvers.
-    
-    UPDATED: Increased grid resolution from M=150, K=80 to M=300, K=150
-             for better accuracy and to ensure finding true optimum.
     
     Args:
         solver_type: 'single' or 'dual'
@@ -938,31 +803,28 @@ def solve_optimal_execution(solver_type='single', impact_model=None, X0=100000,
         if solver_type == 'dual':
             print(f"Dual Control: p={limit_fill_prob:.1%}, spread={bid_ask_spread:.3f}")
     
-    # Create grids
     tk, x_grid, tau, dx = make_grid(T, N, X0, M)
     S_max = X0 / (N * 0.7)
     
     start_time = time.time()
     
     if solver_type == 'single':
-        # Single control solver with FIXED terminal penalty
         V, policy = dp_solver_robust(
             tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
             terminal_penalty=10.0, adaptive_control=True, verbose=verbose
         )
         
-        # Simulate execution
         x_path, S_path = simulate_optimal_path(policy, x_grid, X0, tau)
         
         results = {
             'solver_type': 'single',
             'V': V,
             'policy': policy,
-            'policy_M': policy,  # Alias for compatibility
+            'policy_M': policy,
             'policy_L': None,
             'x_path': x_path,
             'S_path': S_path,
-            'S_M_path': S_path,  # Alias for compatibility
+            'S_M_path': S_path, 
             'S_L_path': None,
             'L_fill_path': None,
             'cost': V[0, -1],
@@ -974,17 +836,14 @@ def solve_optimal_execution(solver_type='single', impact_model=None, X0=100000,
         }
         
     elif solver_type == 'dual':
-        # Dual control solver
-        K_dual = min(K//2, 30)  # Reduce K for computational efficiency
+        K_dual = min(K//2, 30) 
         
-        # Dual control solver with FIXED terminal penalty
         V, policy_M, policy_L = dp_solver_dual_control(
             tk, x_grid, tau, S_max, K_dual, sigma, lam, impact_model,
             terminal_penalty=10.0, limit_fill_prob=limit_fill_prob,
             bid_ask_spread=bid_ask_spread, adaptive_control=True, verbose=verbose
         )
         
-        # Simulate execution
         x_path, S_M_path, S_L_path, L_fill_path = simulate_dual_control_path(
             policy_M, policy_L, x_grid, X0, tau, limit_fill_prob, stochastic=False
         )
@@ -992,11 +851,11 @@ def solve_optimal_execution(solver_type='single', impact_model=None, X0=100000,
         results = {
             'solver_type': 'dual',
             'V': V,
-            'policy': policy_M,  # Primary policy for compatibility
+            'policy': policy_M,  
             'policy_M': policy_M,
             'policy_L': policy_L,
             'x_path': x_path,
-            'S_path': S_M_path,  # Primary trades for compatibility
+            'S_path': S_M_path, 
             'S_M_path': S_M_path,
             'S_L_path': S_L_path,
             'L_fill_path': L_fill_path,
@@ -1037,14 +896,11 @@ def compare_single_vs_dual_control(impact_model, X0=100000, T=1.0, N=100,
     print("SINGLE CONTROL vs DUAL CONTROL COMPARISON")
     print("="*70)
     
-    # Create grids
     tk, x_grid, tau, dx = make_grid(T, N, X0, M)
     S_max = X0 / (N * 0.7)
     
-    # === SINGLE CONTROL SOLVER ===
     print(f"\\nSolving single control (K={K})...")
     start_time = time.time()
-    # FIXED: Use consistent terminal penalty for fair comparison
     terminal_penalty = 1e6
     V_single, policy_single = dp_solver_robust(
         tk, x_grid, tau, S_max, K, sigma, lam, impact_model,
@@ -1052,8 +908,7 @@ def compare_single_vs_dual_control(impact_model, X0=100000, T=1.0, N=100,
     )
     single_time = time.time() - start_time
     
-    # === DUAL CONTROL SOLVER ===
-    K_dual = min(K//2, 25)  # FIXED: Better balance for accuracy vs speed
+    K_dual = min(K//2, 25)  
     print(f"Solving dual control (K={K_dual}, p={limit_fill_prob:.1%})...")
     start_time = time.time()
     V_dual, policy_M_dual, policy_L_dual = dp_solver_dual_control(
@@ -1062,19 +917,12 @@ def compare_single_vs_dual_control(impact_model, X0=100000, T=1.0, N=100,
         bid_ask_spread=bid_ask_spread, adaptive_control=True, verbose=True
     )
     dual_time = time.time() - start_time
-    
-    # === SIMULATE EXECUTION PATHS ===
-    
-    # Single control path
     x_single, S_single = simulate_optimal_path(policy_single, x_grid, X0, tau)
-    
-    # Dual control path (deterministic)
     x_dual, S_M_dual, S_L_dual, L_fill_dual = simulate_dual_control_path(
         policy_M_dual, policy_L_dual, x_grid, X0, tau, 
         limit_fill_prob, stochastic=False
     )
     
-    # === COST ANALYSIS ===
     
     initial_cost_single = V_single[0, -1]
     initial_cost_dual = V_dual[0, -1]
@@ -1090,10 +938,8 @@ def compare_single_vs_dual_control(impact_model, X0=100000, T=1.0, N=100,
     print(f"  Solve time: {dual_time:.2f}s")
     print(f"  Cost improvement: {cost_improvement:.2f}%")
     
-    # Return results without visualization
-    fig = None  # No visualization in core solver
+    fig = None  
     
-    # Return results
     results = {
         'single_cost': initial_cost_single,
         'dual_cost': initial_cost_dual,
@@ -1166,14 +1012,7 @@ def price_path_simulation(S0, T, N, mu, sigma, seed=None):
     
     return t, S
 
-
-# Create alias to match calling convention
 simulate_price_path = price_path_simulation
-
-
-# ============================================================================
-# HELPER FUNCTIONS FOR ANALYSIS
-# ============================================================================
 
 def compute_impact_cost(S_path, impact_model):
     """Sum impact costs over all trades."""
@@ -1200,7 +1039,7 @@ def test_grid_convergence(gammas, baseparams, metric='scalar'):
     """
     T, N, X0, M_base, sigma, K_base, Smax = baseparams
     lam = 5e-6
-    r = 2  # Refinement factor
+    r = 2
     
     grids = [
         ('coarse', M_base//2, K_base//2),
@@ -1245,9 +1084,7 @@ def test_grid_convergence(gammas, baseparams, metric='scalar'):
             
             print(f" V₀={V[0,-1]:.2f}, time={elapsed:.2f}s")
         
-        # Compute errors based on chosen metric
         if metric == 'scalar':
-            # Compare only initial cost
             V_c = grid_results['coarse']['V_initial']
             V_m = grid_results['medium']['V_initial']
             V_f = grid_results['fine']['V_initial']
@@ -1256,28 +1093,20 @@ def test_grid_convergence(gammas, baseparams, metric='scalar'):
             eps_32 = abs(V_f - V_m)
             
         elif metric == 'max':
-            # Compare worst-case across entire grid
             V_c = grid_results['coarse']['V']
             V_m = grid_results['medium']['V']
             V_f = grid_results['fine']['V']
-            
-            # Interpolate to common grid for comparison
-            # (simplified - assume you have interpolation function)
-            eps_21 = np.max(np.abs(V_m[::2, ::2] - V_c))  # Subsample medium
-            eps_32 = np.max(np.abs(V_f[::2, ::2] - V_m))  # Subsample fine
+            eps_21 = np.max(np.abs(V_m[::2, ::2] - V_c))  
+            eps_32 = np.max(np.abs(V_f[::2, ::2] - V_m))  
         
-        # Relative errors
-        V_f_ref = grid_results['fine']['V_initial']  # Use scalar for normalization
+        V_f_ref = grid_results['fine']['V_initial']  
         err_21_rel = (eps_21 / abs(V_f_ref)) * 100
         err_32_rel = (eps_32 / abs(V_f_ref)) * 100
         
-        # Convergence order
         if eps_32 > 1e-10:
             order = np.log2(eps_21 / eps_32)
         else:
             order = 2.0
-        
-        # GCI
         if abs(r**order - 1) > 1e-10:
             GCI = (1.25 * eps_32) / (r**order - 1) / abs(V_f_ref) * 100
         else:
@@ -1290,9 +1119,9 @@ def test_grid_convergence(gammas, baseparams, metric='scalar'):
         print(f"    GCI = {GCI:.3f}%")
         
         if err_32_rel < 1.0:
-            print(f"  ✓ CONVERGED")
+            print(f"  CONVERGED")
         else:
-            print(f"  ⚠ WARNING: error > 1%")
+            print(f"   WARNING: error > 1%")
         
         results[gamma] = {
             'grids': grid_results,
@@ -1317,9 +1146,7 @@ def lob_parametric(eta , gamma ,reference_trade_size):
         A = parametric_cost / reference_trade_size
     
     return powerlawLOB(A, alpha)
-# ============================================================================
-# DIAGNOSTIC FUNCTIONS - CRITICAL FIX #4
-# ============================================================================
+    
 def test_monte_carlo_validation():
     """Validate that simulated paths match GBM theory."""
     print("\n" + "="*60)
@@ -1331,7 +1158,7 @@ def test_monte_carlo_validation():
     N = 100
     mu = 0.05
     sigma = 0.2
-    n_sims = 10000  # Number of paths
+    n_sims = 10000  
     
     final_prices = []
     
@@ -1341,11 +1168,10 @@ def test_monte_carlo_validation():
     
     final_prices = np.array(final_prices)
     
-    # Theoretical expectations
+   
     expected_mean = S0 * np.exp(mu * T)
     expected_std = S0 * np.exp(mu * T) * np.sqrt(np.exp(sigma**2 * T) - 1)
     
-    # Simulated statistics
     sim_mean = final_prices.mean()
     sim_std = final_prices.std()
     
@@ -1373,7 +1199,7 @@ def test_drift_comparison():
     N = 252
     sigma = 0.2
     
-    drifts = [-0.05, 0.0, 0.05]  # Negative, neutral, positive
+    drifts = [-0.05, 0.0, 0.05] 
     
     import matplotlib.pyplot as plt
     plt.figure(figsize=(12, 6))
@@ -1390,36 +1216,28 @@ def test_drift_comparison():
     plt.grid(True, alpha=0.3)
     plt.show()
     
-    print("\n✓ Drift comparison complete")
+    print("\n Drift comparison complete")
 
 def test_price_simulator():
     """Test basic price path simulation."""
     print("\n" + "="*60)
     print("TEST: Price Path Simulator")
     print("="*60)
-    
-    # Test parameters
     S0 = 100.0
     T = 1.0
-    N = 252  # Daily steps for one year
-    mu = 0.05  # 5% annual return
-    sigma = 0.2  # 20% annual volatility
-    
-    # Simulate with seed for reproducibility
+    N = 252  
+    mu = 0.05 
+    sigma = 0.2 
     t, S = price_path_simulation(S0, T, N, mu, sigma, seed=42)
-    
-    # Check outputs
     print(f"\n✓ Generated {len(S)} prices over {len(t)} time points")
     print(f"✓ Initial price: S[0] = {S[0]:.2f}")
     print(f"✓ Final price: S[N] = {S[-1]:.2f}")
     print(f"✓ Return: {(S[-1]/S[0] - 1)*100:.2f}%")
     
-    # Statistical checks
-    returns = np.diff(np.log(S))  # Log returns
+    returns = np.diff(np.log(S)) 
     print(f"\n✓ Mean log return: {returns.mean():.6f} (expected: {(mu - 0.5*sigma**2)/N:.6f})")
     print(f"✓ Std log return: {returns.std():.6f} (expected: {sigma/np.sqrt(N):.6f})")
     
-    # Visual check
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 6))
     plt.plot(t, S, linewidth=1.5)
@@ -1431,7 +1249,7 @@ def test_price_simulator():
     plt.legend()
     plt.show()
     
-    print("\n✓ All tests passed!")
+    print("\n All tests passed!")
 
 
 def diagnose_solution(x_path, S_path, impact_model, sigma, lam, tau, gamma):
@@ -1448,24 +1266,20 @@ def diagnose_solution(x_path, S_path, impact_model, sigma, lam, tau, gamma):
     """
     diagnostics = {}
     
-    # 1. Liquidation completeness
     final_inventory_pct = 100 * x_path[-1] / x_path[0]
     diagnostics['final_inventory_pct'] = final_inventory_pct
     diagnostics['fully_liquidated'] = final_inventory_pct < 1.0
     
-    # 2. Front-loading
     N = len(S_path)
     first_quarter = N // 4
     frontload_pct = 100 * S_path[:first_quarter].sum() / x_path[0]
     diagnostics['frontload_pct'] = frontload_pct
     
-    # 3. Trade size statistics
     diagnostics['avg_trade'] = S_path.mean()
     diagnostics['max_trade'] = S_path.max()
     diagnostics['trade_std'] = S_path.std()
     diagnostics['zero_trades'] = (S_path == 0).sum()
     
-    # 4. Cost decomposition
     total_impact = sum(impact_model.compute(S) for S in S_path)
     total_risk = sum(lam * sigma**2 * x**2 * tau for x in x_path[:-1])
     diagnostics['impact_cost'] = total_impact
@@ -1477,11 +1291,9 @@ def diagnose_solution(x_path, S_path, impact_model, sigma, lam, tau, gamma):
     else:
         diagnostics['impact_dominance'] = 0.5
     
-    # 5. Monotonicity check (inventory should decrease)
     inventory_increases = np.sum(np.diff(x_path) > 1e-6)
     diagnostics['non_monotonic'] = inventory_increases > 0
     
-    # 6. Health score
     health_score = 100.0
     if not diagnostics['fully_liquidated']:
         health_score -= 50
@@ -1525,25 +1337,18 @@ def diagnose_sensitivity_sweep(results_dict, param_name):
         params = np.array(data['params'])
         costs = np.array(data['costs'])
         
-        # Check monotonicity
         frontload_diffs = np.diff(frontloads)
         
         if param_name.lower() == 'lambda':
-            # Higher lambda => more risk averse => more front-loading
             expected_direction = 'increasing'
-            violations = np.sum(frontload_diffs < -0.5)  # Allow small noise
-        else:  # sigma
-            # Higher sigma => more volatility => more front-loading
+            violations = np.sum(frontload_diffs < -0.5)  
+        else:  
             expected_direction = 'increasing'
             violations = np.sum(frontload_diffs < -0.5)
         
         monotonic = violations == 0
-        
-        # Check for clustering (all values too similar)
         frontload_range = frontloads.max() - frontloads.min()
-        clustered = frontload_range < 2.0  # Less than 2% range is suspicious
-        
-        # Check cost monotonicity (should generally increase with lambda/sigma)
+        clustered = frontload_range < 2.0  
         cost_diffs = np.diff(costs)
         cost_decreases = np.sum(cost_diffs < -1e-3)
         cost_monotonic = cost_decreases == 0
@@ -1557,7 +1362,6 @@ def diagnose_sensitivity_sweep(results_dict, param_name):
             'expected_direction': expected_direction
         }
         
-        # Print diagnosis
         status = "✓ HEALTHY" if monotonic and not clustered else "⚠ WARNING"
         print(f"γ={gamma}: {status}")
         print(f"  Front-loading range: {frontload_range:.2f}% (clustered: {clustered})")
@@ -1582,31 +1386,24 @@ def compare_gamma_separation(results_dict):
     print("="*70 + "\n")
     
     gammas = sorted(results_dict.keys())
-    
-    # Compare at first parameter value
     first_frontloads = [results_dict[g]['frontload'][0] for g in gammas]
     
     print(f"Front-loading at first parameter value:")
     for g, fl in zip(gammas, first_frontloads):
         print(f"  γ={g}: {fl:.2f}%")
-    
-    # Check separation
+
     frontload_range = max(first_frontloads) - min(first_frontloads)
     print(f"\nRange: {frontload_range:.2f}%")
     
     if frontload_range < 5.0:
-        print("⚠ WARNING: Gammas produce nearly identical strategies (< 5% range)")
+        print("WARNING: Gammas produce nearly identical strategies (< 5% range)")
         print("  This suggests calibration issues or dominant risk penalty")
     elif frontload_range < 10.0:
-        print("⚠ MARGINAL: Gamma separation is weak (5-10% range)")
+        print("MARGINAL: Gamma separation is weak (5-10% range)")
     else:
-        print("✓ GOOD: Clear separation between gammas (> 10% range)")
+        print("GOOD: Clear separation between gammas (> 10% range)")
     
     print()
-
-# ============================================================================
-# ROBUSTNESS TESTS (Schied 2013)
-# ============================================================================
 
 def test_drift_robustness(gammas, mu_range, base_params):
     """
@@ -1646,7 +1443,6 @@ def test_drift_robustness(gammas, mu_range, base_params):
     lam = base_params['lam']
     terminal_penalty = base_params['terminal_penalty']
     
-    # Grid setup (same for all tests)
     tk, x_grid, tau, dx = make_grid(T, N, X0, M)
     
     print("\n" + "="*70)
@@ -1662,13 +1458,11 @@ def test_drift_robustness(gammas, mu_range, base_params):
         
         results[gamma] = {}
         
-        # Calibrate impact
         eta_calibrated = calibrate_eta(gamma, base_eta=2.5e-6, X0=X0, N=N)
         impact = powerImpact(eta_calibrated, gamma)
         
         print(f"  Calibrated η = {eta_calibrated:.6e}")
         
-        # Solve DP ONCE (drift-independent)
         print(f"  Solving DP...", end=" ")
         import time
         start = time.time()
@@ -1676,26 +1470,18 @@ def test_drift_robustness(gammas, mu_range, base_params):
                             impact, terminal_penalty=terminal_penalty)
         elapsed = time.time() - start
         print(f"done ({elapsed:.2f}s)")
-        
-        # Extract optimal trajectory
         x_path, S_trades = simulate_optimal_path(policy, x_grid, X0, tau)
-        
-        # Compute strategy metrics (drift-independent)
         frontload = compute_frontload_pct(S_trades, cutoff=0.25)
         impact_cost = compute_impact_cost(S_trades, impact)
         risk_cost = compute_risk_cost(x_path, sigma, lam, tau)
         total_cost = V[0, -1]
         
         print(f"  Base strategy: front-load={frontload:.1f}%, cost={total_cost:.2f}")
-        
-        # Test under different drifts
         print(f"\n  Testing across drift scenarios:")
         for mu in mu_range:
-            # Simulate price path (for visualization, not used in costs)
             t_price, S_price = simulate_price_path(S0=100, T=T, N=N, 
                                                    mu=mu, sigma=sigma, seed=42)
             
-            # Store results
             results[gamma][mu] = {
                 'V': V,
                 'policy': policy,
@@ -1706,13 +1492,12 @@ def test_drift_robustness(gammas, mu_range, base_params):
                 'risk_cost': risk_cost,
                 'total_cost': total_cost,
                 't': tk,
-                'S_price': S_price  # For visualization only
+                'S_price': S_price 
             }
             
             print(f"    μ={mu:+.3f}: frontload={frontload:.1f}%, "
                   f"cost={total_cost:.2f} | S: {S_price[0]:.1f}→{S_price[-1]:.1f}")
         
-        # Verify drift-independence
         costs = [results[gamma][mu]['total_cost'] for mu in mu_range]
         frontloads = [results[gamma][mu]['frontload'] for mu in mu_range]
         
@@ -1723,9 +1508,9 @@ def test_drift_robustness(gammas, mu_range, base_params):
         print(f"  ✓ Front-load variation: {frontload_variation:.4f} pct pts (should be ~0)")
         
         if cost_variation < 0.01 and frontload_variation < 0.01:
-            print(f"  ✅ PASSED: Strategy is drift-independent")
+            print(f"PASSED: Strategy is drift-independent")
         else:
-            print(f"  ⚠️  WARNING: Variation detected (numerical precision?)")
+            print(f"WARNING: Variation detected (numerical precision?)")
     
     return results
 
