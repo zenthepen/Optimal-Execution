@@ -1,23 +1,4 @@
-"""
-Realistic Optimal Execution Solver with Full Market Impact Model
 
-Implements progressively realistic constraints following Curato et al. (2014):
-- Step 1: Baseline instantaneous impact (from de_solver.py)
-- Step 2: Trade size limits (market depth constraints)
-- Step 3: Bid-ask spread cost (linear transaction cost)
-- Step 4: Permanent + transient impact decomposition
-- Step 5: Exponential decay for transient component
-- Step 6: Literature-calibrated default parameters
-
-Key Features:
-- NO corner solutions (natural constraints prevent instant execution)
-- Realistic front-loading (smooth, economically justified)
-- Empirically calibrated (Curato et al. 2014, Almgren-Chriss 2001)
-- Passes perturbation test with realistic parameters
-
-Author: Generated for optimal execution project
-Date: 2025-10-28
-"""
 
 import numpy as np
 import time
@@ -26,40 +7,6 @@ from typing import Dict, Optional
 
 
 class OptimalExecutionRealistic:
-    """
-    Realistic Optimal Execution with Full Market Impact Model.
-    
-    Mathematical Formulation:
-    -------------------------
-    minimize: Σᵢ [impact_cost + spread_cost + risk_cost]
-    
-    where:
-        impact_cost = S[i] * (decayed_transient + permanent + new_transient) * S₀
-        permanent = η_perm * |S[i]|^γ  (never decays)
-        new_transient = η_trans * |S[i]|^γ  (decays exponentially)
-        decayed_transient *= exp(-ρ * τ)  (from previous periods)
-        
-        spread_cost = spread_per_share * S[i]
-        risk_cost = 0.5 * λ * inventory² * σ² * τ
-    
-    Constraints:
-        Σᵢ S[i] = X₀  (complete liquidation)
-        0 ≤ S[i] ≤ max_trade_per_period  (liquidity limits)
-    
-    Key Insight:
-    -----------
-    Transient accumulation naturally prevents corner solutions:
-    - Large concentrated trades → high transient buildup
-    - Waiting allows transient to decay before next trade
-    - Result: Smooth, realistic front-loading
-    
-    Literature References:
-    ---------------------
-    - Curato, Gatheral, Lillo (2014): Transient impact decomposition
-    - Almgren, Chriss (2001): Risk aversion framework
-    - Bouchaud et al. (2004): Market impact decay
-    - Gatheral (2010): No-dynamic-arbitrage bounds
-    """
     
     def __init__(self,
                  X0: float,
@@ -70,11 +17,8 @@ class OptimalExecutionRealistic:
                  eta: float,
                  gamma: float,
                  S0: float,
-                 # Step 2: Trade size constraints
                  max_trade_fraction: float = 0.4,
-                 # Step 3: Bid-ask spread
                  spread_bps: float = 1.0,
-                 # Step 4-5: Permanent + transient with decay
                  permanent_fraction: float = 0.4,
                  decay_rate: float = 0.5):
         """
@@ -143,7 +87,6 @@ class OptimalExecutionRealistic:
             
             Default 0.5 based on Curato et al. (2014) calibration.
         """
-        # Core parameters (from Step 1)
         self.X0 = X0
         self.T = T
         self.N = N
@@ -153,21 +96,13 @@ class OptimalExecutionRealistic:
         self.gamma = gamma
         self.S0 = S0
         self.tau = T / N
-        
-        # Step 2: Trade size constraints
         self.max_trade_fraction = max_trade_fraction
         self.max_trade_per_period = X0 * max_trade_fraction
-        
-        # Step 3: Spread cost
         self.spread_bps = spread_bps
         self.spread_cost_per_share = spread_bps * 0.0001 * S0
-        
-        # Step 4: Permanent + transient decomposition
         self.permanent_fraction = permanent_fraction
         self.eta_permanent = eta * permanent_fraction
         self.eta_transient = eta * (1 - permanent_fraction)
-        
-        # Step 5: Transient decay
         self.decay_rate = decay_rate
         
     def cost_function(self, S: np.ndarray, debug: bool = False) -> float:
@@ -196,7 +131,7 @@ class OptimalExecutionRealistic:
             Total expected cost (impact + spread + risk)
         """
         tau = self.tau
-        price_displacement = 0.0  # Accumulated transient impact
+        price_displacement = 0.0
         inventory = self.X0
         total_cost = 0.0
         
@@ -220,36 +155,16 @@ class OptimalExecutionRealistic:
         risk_costs = []
         
         for i in range(self.N):
-            # 1. Decay previous transient impact (exponential resilience)
             decay_factor = np.exp(-self.decay_rate * tau)
             price_displacement = price_displacement * decay_factor
-            
-            # 2. Compute permanent impact (never decays)
             permanent_impact = self.eta_permanent * (np.abs(S[i]) ** self.gamma)
-            
-            # 3. Compute new transient impact (will decay in future)
             transient_impact = self.eta_transient * (np.abs(S[i]) ** self.gamma)
-            
-            # 4. Total price displacement this period
             current_price_impact = price_displacement + permanent_impact + transient_impact
-            
-            # 5. Market impact cost (paid on displaced price)
-            # Cost = S[i] × (price impact coefficient) × S₀
-            # where price impact coefficient = η × |S[i]|^γ
             impact_cost = S[i] * current_price_impact * self.S0
-            
-            # 6. Spread cost (linear in trade size)
             spread_cost = self.spread_cost_per_share * S[i]
-            
-            # 7. Update inventory (after trade)
             inventory -= S[i]
-            
-            # 8. Risk cost (inventory risk during period)
             risk_cost = 0.5 * self.lam * (inventory ** 2) * (self.sigma ** 2) * tau
-            
-            # 9. Accumulate costs
-            total_cost += impact_cost + spread_cost + risk_cost
-            
+            total_cost += impact_cost + spread_cost + risk_cost 
             impact_costs.append(impact_cost)
             spread_costs.append(spread_cost)
             risk_costs.append(risk_cost)
@@ -268,7 +183,6 @@ class OptimalExecutionRealistic:
                 print(f"  Remaining inventory: {inventory:,.2f}")
                 print()
             
-            # 10. Update price displacement for next period (transient persists)
             price_displacement = price_displacement + transient_impact
         
         if debug:
@@ -296,19 +210,13 @@ class OptimalExecutionRealistic:
         Returns:
             Cost of projected (feasible) strategy
         """
-        # Step 1: Enforce non-negativity and trade size limits
         S_feasible = np.clip(S, 0, self.max_trade_per_period)
-        
-        # Step 2: Normalize to sum to X0
         sum_S = np.sum(S_feasible)
         if sum_S > 1e-10:
             S_feasible = S_feasible * (self.X0 / sum_S)
         else:
-            # If all zeros, use TWAP as fallback
             S_feasible = np.ones(self.N) * self.X0 / self.N
             S_feasible = np.minimum(S_feasible, self.max_trade_per_period)
-        
-        # Compute cost of feasible strategy
         return self.cost_function(S_feasible)
     
     def solve(self, 
@@ -355,11 +263,7 @@ class OptimalExecutionRealistic:
             print()
         
         start_time = time.time()
-        
-        # Define bounds: 0 ≤ S[i] ≤ max_trade_per_period
         bounds = [(0, self.max_trade_per_period) for _ in range(self.N)]
-        
-        # Run Differential Evolution
         result = differential_evolution(
             func=self.cost_with_projection,
             bounds=bounds,
@@ -378,21 +282,15 @@ class OptimalExecutionRealistic:
         )
         
         solve_time = time.time() - start_time
-        
-        # Project final solution to ensure exact feasibility
         S_optimal = np.clip(result.x, 0, self.max_trade_per_period)
         sum_S = np.sum(S_optimal)
         if sum_S > 1e-10:
             S_optimal = S_optimal * (self.X0 / sum_S)
-        
-        # Compute final cost
         final_cost = self.cost_function(S_optimal)
-        
-        # Compute cost breakdown for diagnostics
         cost_breakdown = self._compute_cost_breakdown(S_optimal)
         
         if verbose:
-            print(f"✅ Optimization complete")
+            print(f"   Optimization complete")
             print(f"   Iterations: {result.nit}")
             print(f"   Function evaluations: {result.nfev}")
             print(f"   Time: {solve_time:.2f}s")
@@ -448,25 +346,15 @@ class OptimalExecutionRealistic:
         risk_cost_total = 0.0
         
         for i in range(self.N):
-            # Decay transient
             decay_factor = np.exp(-self.decay_rate * tau)
             price_displacement = price_displacement * decay_factor
-            
-            # Compute impacts
             permanent_impact = self.eta_permanent * (np.abs(S[i]) ** self.gamma)
             transient_impact = self.eta_transient * (np.abs(S[i]) ** self.gamma)
             current_price_impact = price_displacement + permanent_impact + transient_impact
-            
-            # Accumulate costs
-            # Impact cost = S[i] × (price impact coefficient) × S₀
             impact_cost_total += S[i] * current_price_impact * self.S0
             spread_cost_total += self.spread_cost_per_share * S[i]
-            
-            # Update inventory and compute risk
             inventory -= S[i]
             risk_cost_total += 0.5 * self.lam * (inventory ** 2) * (self.sigma ** 2) * tau
-            
-            # Update price displacement
             price_displacement = price_displacement + transient_impact
         
         total = impact_cost_total + spread_cost_total + risk_cost_total
@@ -491,12 +379,10 @@ def solve_optimal_execution_realistic(
     eta: float,
     gamma: float,
     S0: float,
-    # Optional constraint overrides (use defaults if None)
     max_trade_fraction: Optional[float] = None,
     spread_bps: Optional[float] = None,
     permanent_fraction: Optional[float] = None,
     decay_rate: Optional[float] = None,
-    # Solver settings
     maxiter: int = 2000,
     popsize: int = 40,
     polish: bool = True,
@@ -551,7 +437,6 @@ def solve_optimal_execution_realistic(
     dict
         optimal_trades, cost, cost_breakdown, solve_time, etc.
     """
-    # Set defaults if not specified
     if max_trade_fraction is None:
         max_trade_fraction = 0.4
     if spread_bps is None:
@@ -560,8 +445,7 @@ def solve_optimal_execution_realistic(
         permanent_fraction = 0.4
     if decay_rate is None:
         decay_rate = 0.5
-    
-    # Create solver
+
     solver = OptimalExecutionRealistic(
         X0=X0, T=T, N=N,
         sigma=sigma, lam=lam,
@@ -572,7 +456,6 @@ def solve_optimal_execution_realistic(
         decay_rate=decay_rate
     )
     
-    # Solve
     result = solver.solve(
         maxiter=maxiter,
         popsize=popsize,
@@ -608,7 +491,6 @@ def compare_instantaneous_vs_realistic(
         print("COMPARISON: INSTANTANEOUS vs REALISTIC IMPACT MODELS")
         print("="*80 + "\n")
     
-    # Solve with instantaneous impact (baseline)
     if verbose:
         print("1. INSTANTANEOUS IMPACT MODEL (Baseline)")
         print("-" * 80)
@@ -624,7 +506,6 @@ def compare_instantaneous_vs_realistic(
         print("\n2. REALISTIC FULL MODEL")
         print("-" * 80)
     
-    # Solve with realistic model
     result_realistic = solve_optimal_execution_realistic(
         X0=X0, T=T, N=N,
         sigma=sigma, lam=lam,
@@ -632,7 +513,6 @@ def compare_instantaneous_vs_realistic(
         verbose=verbose
     )
     
-    # Compute comparison metrics
     instant_trades = result_instant['optimal_trades']
     realistic_trades = result_realistic['optimal_trades']
     
@@ -691,7 +571,6 @@ if __name__ == "__main__":
     print("="*80)
     print()
     
-    # Test parameters (SNAP - from calibration)
     X0 = 100000
     T = 1.0
     N = 10
@@ -708,7 +587,6 @@ if __name__ == "__main__":
     print(f"  η = {eta:.2e}, γ = {gamma:.4f}, S₀ = ${S0:.2f}")
     print()
     
-    # Run comparison
     comparison = compare_instantaneous_vs_realistic(
         X0=X0, T=T, N=N,
         sigma=sigma, lam=lam,
@@ -716,7 +594,6 @@ if __name__ == "__main__":
         verbose=True
     )
     
-    # Validate expectations
     print("="*80)
     print("VALIDATION CHECKS")
     print("="*80)
@@ -726,29 +603,28 @@ if __name__ == "__main__":
     realistic_max = comparison['realistic']['max_trade_pct']
     cost_increase = comparison['cost_increase']
     
-    # Check 1: Instantaneous has corner solution
     check1 = instant_max > 0.95
     print(f"✓ Check 1: Instantaneous has corner solution (>95% in one trade)")
-    print(f"  Result: {instant_max:.1%} {'✅ PASS' if check1 else '❌ FAIL'}")
+    print(f"  Result: {instant_max:.1%} {'PASS' if check1 else ' FAIL'}")
     
     # Check 2: Realistic respects trade size limit
     check2 = realistic_max <= 0.41  # Allow 1% tolerance
     print(f"\n✓ Check 2: Realistic respects 40% trade size limit")
-    print(f"  Result: {realistic_max:.1%} {'✅ PASS' if check2 else '❌ FAIL'}")
+    print(f"  Result: {realistic_max:.1%} {'PASS' if check2 else ' FAIL'}")
     
     # Check 3: Cost increase is reasonable
     check3 = 0 < cost_increase < 0.5  # Between 0% and 50%
     print(f"\n✓ Check 3: Cost increase is reasonable (<50%)")
-    print(f"  Result: {cost_increase:.1%} {'✅ PASS' if check3 else '❌ FAIL'}")
+    print(f"  Result: {cost_increase:.1%} {' PASS' if check3 else ' FAIL'}")
     
     # Check 4: Realistic uses multiple periods
     realistic_active = comparison['realistic']['num_nonzero_trades']
     check4 = realistic_active >= 3
     print(f"\n✓ Check 4: Realistic strategy uses multiple periods (≥3)")
-    print(f"  Result: {realistic_active} periods {'✅ PASS' if check4 else '❌ FAIL'}")
+    print(f"  Result: {realistic_active} periods {' PASS' if check4 else ' FAIL'}")
     
     all_pass = check1 and check2 and check3 and check4
     print()
     print("="*80)
-    print(f"OVERALL: {'✅ ALL TESTS PASSED' if all_pass else '❌ SOME TESTS FAILED'}")
+    print(f"OVERALL: {' ALL TESTS PASSED' if all_pass else ' SOME TESTS FAILED'}")
     print("="*80)
