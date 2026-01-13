@@ -54,36 +54,35 @@ class LiquidityCalibrator:
         self.lookback_days = lookback_days
         self.conservative_mode = conservative_mode
         
-        # Liquidity tiers based on ADV (shares/day)
         self.tiers = {
             'very_high': {
                 'min_adv': 5_000_000,
                 'max_adv': float('inf'),
-                'limit_range': (0.10, 0.15),  # 10-15%
+                'limit_range': (0.10, 0.15),  
                 'description': 'Very High Liquidity (>5M ADV)'
             },
             'high': {
                 'min_adv': 1_000_000,
                 'max_adv': 5_000_000,
-                'limit_range': (0.15, 0.25),  # 15-25%
+                'limit_range': (0.15, 0.25), 
                 'description': 'High Liquidity (1-5M ADV)'
             },
             'medium': {
                 'min_adv': 500_000,
                 'max_adv': 1_000_000,
-                'limit_range': (0.20, 0.30),  # 20-30%
+                'limit_range': (0.20, 0.30),
                 'description': 'Medium Liquidity (500k-1M ADV)'
             },
             'low': {
                 'min_adv': 100_000,
                 'max_adv': 500_000,
-                'limit_range': (0.30, 0.40),  # 30-40%
+                'limit_range': (0.30, 0.40)
                 'description': 'Low Liquidity (100k-500k ADV)'
             },
             'very_low': {
                 'min_adv': 0,
                 'max_adv': 100_000,
-                'limit_range': (0.40, 0.50),  # 40-50%
+                'limit_range': (0.40, 0.50),
                 'description': 'Very Low Liquidity (<100k ADV)'
             }
         }
@@ -106,8 +105,6 @@ class LiquidityCalibrator:
         """
         try:
             stock = yf.Ticker(ticker)
-            
-            # Fetch extra days to ensure we get enough trading days
             end_date = datetime.now()
             start_date = end_date - timedelta(days=self.lookback_days + 10)
             
@@ -116,7 +113,6 @@ class LiquidityCalibrator:
             if len(hist) == 0:
                 raise ValueError(f"No data available for {ticker}")
             
-            # Use last N trading days
             volumes = hist['Volume'].tail(self.lookback_days)
             adv = float(volumes.mean())
             n_days = len(volumes)
@@ -148,8 +144,6 @@ class LiquidityCalibrator:
         for tier_name, tier_info in self.tiers.items():
             if tier_info['min_adv'] <= adv < tier_info['max_adv']:
                 return tier_name, tier_info
-        
-        # Default to very_low if somehow not matched
         return 'very_low', self.tiers['very_low']
     
     def compute_order_to_adv_ratio(self, 
@@ -206,26 +200,20 @@ class LiquidityCalibrator:
             - justification: Explanation
             - calibration_date: Timestamp
         """
-        # Fetch ADV
         adv, adv_days = self.fetch_adv(ticker)
         
-        # Classify liquidity
         tier_name, tier_info = self.classify_liquidity(adv)
         
-        # Compute order/ADV ratio
         order_to_adv = self.compute_order_to_adv_ratio(order_size, adv)
         
-        # Select limit based on mode
         limit_range = tier_info['limit_range']
         if self.conservative_mode:
-            max_trade_fraction = limit_range[0]  # Lower bound (safer)
+            max_trade_fraction = limit_range[0]  
         else:
-            max_trade_fraction = limit_range[1]  # Upper bound (aggressive)
-        
-        # Check if order is >20% ADV (SEC RATS threshold)
+            max_trade_fraction = limit_range[1]
+
         rats_warning = order_to_adv > 0.20
         
-        # Prepare result
         result = {
             'max_trade_fraction': max_trade_fraction,
             'adv': adv,
@@ -271,7 +259,7 @@ Rationale:
         if rats_warning:
             justification += f"""
 
-⚠️  SEC RATS WARNING:
+SEC RATS WARNING:
 Order is {order_to_adv:.1%} of ADV (>20% threshold)
 This is a "Regulation Automated Trading System" reportable order.
 Consider splitting across multiple days or using VWAP execution."""
@@ -294,7 +282,7 @@ Consider splitting across multiple days or using VWAP execution."""
         print(f"  ({'Conservative' if self.conservative_mode else 'Aggressive'} mode)")
         
         if result['rats_warning']:
-            print("\n⚠️  WARNING: Order exceeds 20% of ADV (SEC RATS threshold)")
+            print("\n WARNING: Order exceeds 20% of ADV (SEC RATS threshold)")
         
         print("="*80 + "\n")
     
@@ -330,7 +318,7 @@ Consider splitting across multiple days or using VWAP execution."""
                 )
                 results[ticker] = result
             except Exception as e:
-                print(f"❌ Failed to calibrate {ticker}: {e}\n")
+                print(f" Failed to calibrate {ticker}: {e}\n")
                 results[ticker] = None
         
         return results
@@ -355,11 +343,9 @@ Consider splitting across multiple days or using VWAP execution."""
         
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate filename
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = output_dir / f'liquidity_calibration_{timestamp}.json'
         
-        # Convert to serializable format
         serializable = {}
         for ticker, result in calibration_results.items():
             if result is None:
@@ -379,7 +365,7 @@ Consider splitting across multiple days or using VWAP execution."""
         with open(filename, 'w') as f:
             json.dump(serializable, f, indent=2)
         
-        print(f"✅ Calibration saved to: {filename}")
+        print(f"Calibration saved to: {filename}")
         return filename
 
 
@@ -401,7 +387,6 @@ def load_liquidity_calibration(ticker: str,
         Calibration results for the ticker
     """
     if calibration_file is None:
-        # Look for latest calibration file
         calib_dir = Path(__file__).parent.parent / '05_calibrated_data'
         calib_files = list(calib_dir.glob('liquidity_calibration_*.json'))
         
@@ -410,7 +395,6 @@ def load_liquidity_calibration(ticker: str,
                 f"No liquidity calibration files found in {calib_dir}"
             )
         
-        # Get most recent
         calibration_file = max(calib_files, key=lambda p: p.stat().st_mtime)
     
     with open(calibration_file, 'r') as f:
@@ -425,10 +409,6 @@ def load_liquidity_calibration(ticker: str,
     return all_calibrations[ticker]
 
 
-# ============================================================================
-# EXAMPLE USAGE
-# ============================================================================
-
 if __name__ == "__main__":
     """
     Example usage of adaptive liquidity calibration.
@@ -438,13 +418,11 @@ if __name__ == "__main__":
     print("ADAPTIVE LIQUIDITY CALIBRATION - EXAMPLES")
     print("="*80 + "\n")
     
-    # Initialize calibrator
     calibrator = LiquidityCalibrator(
         lookback_days=30,
         conservative_mode=True
     )
     
-    # Example 1: Single stock
     print("\n" + "="*80)
     print("EXAMPLE 1: SINGLE STOCK CALIBRATION")
     print("="*80)
@@ -457,7 +435,6 @@ if __name__ == "__main__":
     
     print(f"Recommended max_trade_fraction: {result_snap['max_trade_fraction']:.1%}")
     
-    # Example 2: Multiple stocks (your 3 test assets)
     print("\n\n" + "="*80)
     print("EXAMPLE 2: CALIBRATE YOUR 3 TEST ASSETS")
     print("="*80 + "\n")
@@ -469,11 +446,9 @@ if __name__ == "__main__":
     }
     
     results = calibrator.calibrate_multiple_stocks(test_assets, verbose=True)
-    
-    # Save calibration
+
     saved_file = calibrator.save_calibration(results)
-    
-    # Summary comparison
+
     print("\n" + "="*80)
     print("SUMMARY: CONSTRAINT COMPARISON")
     print("="*80)
