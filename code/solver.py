@@ -607,17 +607,14 @@ if __name__ == "__main__":
     print(f"✓ Check 1: Instantaneous has corner solution (>95% in one trade)")
     print(f"  Result: {instant_max:.1%} {'PASS' if check1 else ' FAIL'}")
     
-    # Check 2: Realistic respects trade size limit
-    check2 = realistic_max <= 0.41  # Allow 1% tolerance
+    check2 = realistic_max <= 0.41 
     print(f"\n✓ Check 2: Realistic respects 40% trade size limit")
     print(f"  Result: {realistic_max:.1%} {'PASS' if check2 else ' FAIL'}")
     
-    # Check 3: Cost increase is reasonable
-    check3 = 0 < cost_increase < 0.5  # Between 0% and 50%
+    check3 = 0 < cost_increase < 0.5  
     print(f"\n✓ Check 3: Cost increase is reasonable (<50%)")
     print(f"  Result: {cost_increase:.1%} {' PASS' if check3 else ' FAIL'}")
     
-    # Check 4: Realistic uses multiple periods
     realistic_active = comparison['realistic']['num_nonzero_trades']
     check4 = realistic_active >= 3
     print(f"\n✓ Check 4: Realistic strategy uses multiple periods (≥3)")
