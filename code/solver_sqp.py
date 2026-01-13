@@ -22,21 +22,7 @@ from typing import Dict, List, Tuple, Optional
 
 
 class OptimalExecutionSQP:
-    """
-    SQP-based solver for optimal execution with power-law impact.
-    
-    Mathematical Formulation:
-    -------------------------
-    minimize: Σᵢ [η|Sᵢ|^γ·S₀ + 0.5·λ·σ²·xᵢ²·τ]
-    
-    subject to:
-        Σᵢ Sᵢ = X₀  (complete liquidation)
-        Sᵢ ≥ 0      (no buying)
-        
-    where:
-        xᵢ = X₀ - Σⱼ₌₁ⁱ Sⱼ  (inventory after trade i)
-        τ = T/N              (time step)
-    """
+
     
     def __init__(self, X0: float, T: float, N: int, sigma: float, lam: float, 
                  eta: float, gamma: float, S0: float):
@@ -61,33 +47,19 @@ class OptimalExecutionSQP:
         self.eta = eta
         self.gamma = gamma
         self.S0 = S0
-        self.tau = T / N  # Time step size
+        self.tau = T / N  
         
     def cost_function(self, S: np.ndarray) -> float:
-        """
-        Compute total expected cost for trading strategy S.
-        
-        CRITICAL: Uses inventory AFTER trade for volatility cost.
-        This matches the fixed DP solver implementation.
-        
-        Args:
-            S: Trading strategy [S₁, S₂, ..., Sₙ]
-            
-        Returns:
-            Total expected cost (impact + risk)
-        """
+    
         total_cost = 0.0
         inventory = self.X0
         
         for i in range(self.N):
-            # Impact cost (instantaneous, paid at execution)
+            
             impact = self.eta * (np.abs(S[i]) ** self.gamma) * self.S0
             
-            # Update inventory AFTER trade
             inventory -= S[i]
             
-            # Risk cost (inventory held during period)
-            # Uses inventory AFTER trade (correct per Almgren-Chriss)
             risk = 0.5 * self.lam * (inventory ** 2) * (self.sigma ** 2) * self.tau
             
             total_cost += impact + risk
@@ -95,33 +67,17 @@ class OptimalExecutionSQP:
         return total_cost
     
     def cost_gradient(self, S: np.ndarray) -> np.ndarray:
-        """
-        Compute gradient of cost function for faster optimization.
-        
-        ∂C/∂Sᵢ = η·γ·|Sᵢ|^(γ-1)·S₀·sign(Sᵢ) - λ·σ²·τ·Σⱼ≥ᵢ xⱼ
-        
-        Args:
-            S: Trading strategy
-            
-        Returns:
-            Gradient vector ∂C/∂S
-        """
         grad = np.zeros(self.N)
-        
-        # Compute inventories after each trade
         inventories = self.X0 - np.cumsum(S)
         
         for i in range(self.N):
-            # Impact gradient
+           
             if abs(S[i]) > 1e-12:
                 impact_grad = self.eta * self.gamma * (np.abs(S[i]) ** (self.gamma - 1)) * \
                              self.S0 * np.sign(S[i])
             else:
-                # Handle S[i] ≈ 0 to avoid numerical issues
+               
                 impact_grad = 0.0
-            
-            # Risk gradient (affects all future periods)
-            # ∂/∂Sᵢ [Σⱼ≥ᵢ 0.5·λ·σ²·xⱼ²·τ] = -λ·σ²·τ·Σⱼ≥ᵢ xⱼ
             risk_grad = -self.lam * (self.sigma ** 2) * self.tau * np.sum(inventories[i:])
             
             grad[i] = impact_grad + risk_grad
@@ -129,49 +85,29 @@ class OptimalExecutionSQP:
         return grad
     
     def constraint_complete_liquidation(self, S: np.ndarray) -> float:
-        """
-        Equality constraint: sum(S) - X₀ = 0
-        
-        Args:
-            S: Trading strategy
-            
-        Returns:
-            Constraint violation (should be 0)
-        """
         return np.sum(S) - self.X0
     
     def constraint_gradient(self, S: np.ndarray) -> np.ndarray:
-        """Gradient of liquidation constraint: all ones."""
         return np.ones(self.N)
     
     def generate_initial_guesses(self, num_guesses: int = 5) -> List[np.ndarray]:
-        """
-        Generate diverse initial guesses for multi-start optimization.
-        
-        Args:
-            num_guesses: Number of initial guesses to generate (default 5, can use 50+ for robustness)
-        
-        Returns:
-            List of initial strategies, each summing to X₀
-        """
         guesses = []
         
-        # 1. TWAP (uniform)
         twap = np.ones(self.N) * self.X0 / self.N
         guesses.append(twap)
         
-        # 2. Front-loaded (exponential decay)
+ 
         decay_factor = 0.9
         front = np.array([self.X0 * (1 - decay_factor) * (decay_factor ** i) 
                          for i in range(self.N)])
         front = front * self.X0 / (np.sum(front) + 1e-10)
         guesses.append(front)
         
-        # 3. Back-loaded (reverse of front-loaded)
+   
         back = front[::-1].copy()
         guesses.append(back)
         
-        # 4. Middle-peaked (Gaussian)
+
         center = self.N / 2
         width = self.N / 4
         middle = np.array([np.exp(-0.5 * ((i - center) / width) ** 2) 
@@ -179,64 +115,53 @@ class OptimalExecutionSQP:
         middle = middle * self.X0 / (np.sum(middle) + 1e-10)
         guesses.append(middle)
         
-        # 5. Random monotone (exponential distribution)
+
         rng = np.random.default_rng(42)
         random = rng.exponential(self.X0 / self.N, self.N)
         random = random * self.X0 / (np.sum(random) + 1e-10)
         guesses.append(random)
         
-        # If more guesses requested, add random variations
+
         if num_guesses > 5:
             rng = np.random.default_rng(42)
             
             for i in range(num_guesses - 5):
-                # Generate different types of random guesses
+
                 guess_type = i % 5
                 
                 if guess_type == 0:
-                    # Random exponential with varying rate
+       
                     rate = rng.uniform(0.5, 2.0)
                     guess = rng.exponential(self.X0 / (self.N * rate), self.N)
                 elif guess_type == 1:
-                    # Random Gaussian mixture
+       
                     center1 = rng.uniform(0, self.N)
                     width1 = rng.uniform(self.N / 6, self.N / 3)
                     guess = np.array([np.exp(-0.5 * ((j - center1) / width1) ** 2) 
                                      for j in range(self.N)])
                 elif guess_type == 2:
-                    # Random Dirichlet (ensures sum = 1, then scale)
+   
                     alpha = rng.uniform(0.1, 2.0, self.N)
                     guess = rng.dirichlet(alpha)  * self.X0
                 elif guess_type == 3:
-                    # Random power-law
+                
                     alpha = rng.uniform(0.5, 2.0)
                     guess = np.array([(j + 1) ** (-alpha) for j in range(self.N)])
                 else:
-                    # Random monotone decreasing
+                   
                     guess = np.sort(rng.uniform(0, 1, self.N))[::-1]
                 
-                # Normalize to sum to X0
                 guess = guess * self.X0 / (np.sum(guess) + 1e-10)
                 guesses.append(guess)
         
         return guesses
     
     def solve_from_guess(self, S0_guess: np.ndarray, verbose: bool = False) -> 'minimize':
-        """
-        Solve optimization from single initial guess using SLSQP.
-        
-        Args:
-            S0_guess: Initial guess for trades
-            verbose: Print optimization progress
-            
-        Returns:
-            scipy.optimize.OptimizeResult object
-        """
         result = minimize(
             fun=self.cost_function,
             x0=S0_guess,
             method='SLSQP',
-            jac=self.cost_gradient,  # Provide gradient for faster convergence
+            jac=self.cost_gradient, 
             bounds=[(0, self.X0) for _ in range(self.N)],
             constraints=[{
                 'type': 'eq',
@@ -253,16 +178,6 @@ class OptimalExecutionSQP:
         return result
     
     def solve(self, num_guesses: int = 5, verbose: bool = True) -> Dict:
-        """
-        Solve using multiple starts. Try all initial guesses, return best result.
-        
-        Args:
-            num_guesses: Number of initial guesses to try (default 5, use 50+ for robustness)
-            verbose: Print progress information
-            
-        Returns:
-            Dictionary with solution details
-        """
         if verbose:
             print("="*70)
             print("SQP OPTIMAL EXECUTION SOLVER")
@@ -279,7 +194,6 @@ class OptimalExecutionSQP:
         best_cost = np.inf
         best_guess_idx = -1
         
-        # Try all initial guesses
         for idx, guess in enumerate(initial_guesses):
             if verbose and (idx < 5 or idx % 10 == 0 or idx == len(initial_guesses) - 1):
                 if idx < 5:
@@ -297,7 +211,6 @@ class OptimalExecutionSQP:
                 else:
                     print(f"  ❌ Failed: {result.message}")
             
-            # Update best result
             if result.success and result.fun < best_cost:
                 best_cost = result.fun
                 best_result = result
@@ -315,7 +228,6 @@ class OptimalExecutionSQP:
                 print("❌ No successful solution found")
             print("="*70)
         
-        # Prepare return dictionary
         if best_result is not None:
             return {
                 'optimal_trades': best_result.x,
@@ -330,7 +242,6 @@ class OptimalExecutionSQP:
                 'method': f'SLSQP (multi-start {num_guesses})'
             }
         else:
-            # All guesses failed
             return {
                 'optimal_trades': None,
                 'cost': np.inf,
@@ -345,15 +256,6 @@ class OptimalExecutionSQP:
             }
     
     def validate_solution(self, trades: np.ndarray) -> Dict:
-        """
-        Validate solution satisfies constraints and bounds.
-        
-        Args:
-            trades: Proposed trading strategy
-            
-        Returns:
-            Dictionary with validation results
-        """
         sum_trades = np.sum(trades)
         sum_error = abs(sum_trades - self.X0)
         min_trade = np.min(trades)
@@ -374,15 +276,7 @@ class OptimalExecutionSQP:
         }
     
     def compare_to_twap(self, optimal_trades: np.ndarray) -> Dict:
-        """
-        Compare optimal solution to TWAP benchmark.
-        
-        Args:
-            optimal_trades: Optimal trading strategy
-            
-        Returns:
-            Comparison metrics
-        """
+    
         twap_trades = np.ones(self.N) * self.X0 / self.N
         
         optimal_cost = self.cost_function(optimal_trades)
@@ -398,11 +292,6 @@ class OptimalExecutionSQP:
             'improvement_percent': improvement_pct,
             'twap_trades': twap_trades
         }
-
-
-# ============================================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================================
 
 def solve_optimal_execution_sqp(X0: float, T: float, N: int, sigma: float, 
                                lam: float, eta: float, gamma: float, S0: float,
@@ -444,18 +333,12 @@ def compute_twap_cost(X0: float, T: float, N: int, sigma: float, lam: float,
     solver = OptimalExecutionSQP(X0, T, N, sigma, lam, eta, gamma, S0)
     return solver.cost_function(twap_trades)
 
-
-# ============================================================================
-# TESTING AND VALIDATION
-# ============================================================================
-
 def run_snap_example():
     """Run example on SNAP parameters (matching your calibration)."""
     print("\n" + "="*70)
     print("EXAMPLE: SNAP OPTIMAL EXECUTION (SQP)")
     print("="*70 + "\n")
     
-    # SNAP parameters from your calibration
     result = solve_optimal_execution_sqp(
         X0=100000,      # 100k shares
         T=1.0,          # 1 day
@@ -486,7 +369,7 @@ def run_snap_example():
         print(f"  Total: {np.sum(result['optimal_trades']):,.0f} shares")
         print()
         
-        # Validate solution
+        
         solver = OptimalExecutionSQP(100000, 1.0, 10, 0.0348, 1e-6, 2e-7, 0.67, 7.92)
         validation = solver.validate_solution(result['optimal_trades'])
         print("Validation:")
@@ -495,7 +378,7 @@ def run_snap_example():
         print(f"  Solution valid: {validation['is_valid']} ✅")
         print()
         
-        # Compare to TWAP
+       
         comparison = solver.compare_to_twap(result['optimal_trades'])
         print("Comparison to TWAP:")
         print(f"  TWAP cost: ${comparison['twap_cost']:.2f}")
